@@ -1,0 +1,13 @@
+[Unit]
+Description=Lm Studio CLI Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/lorenzo/.cache/lm-studio/bin/lms server start
+WorkingDirectory=/home/lorenzo/.cache/lm-studio/
+Restart=on-failure
+ExecStop=/bin/sh -c 'lms unload --all && lms server stop'
+
+[Install]
+WantedBy=default.target

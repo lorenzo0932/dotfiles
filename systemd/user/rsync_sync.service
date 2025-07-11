@@ -1,0 +1,8 @@
+[Unit]
+Description=Script di sincronizzazione rsync
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/lorenzo/.local/share/myScript/rSync
+EnvironmentFile=/home/lorenzo/.local/share/myScript/rSync/gemini.env
+ExecStart=/home/lorenzo/.local/share/myScript/rSync/rSync.sh

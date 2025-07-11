@@ -1,0 +1,9 @@
+[Unit]
+Description=Esecuzione settimanale dello script di sincronizzazione rsync
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

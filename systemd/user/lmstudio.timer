@@ -1,0 +1,9 @@
+[Unit]
+Description=Timer per avvio ritardato di Lm Studio CLI Server
+
+[Timer]
+OnUnitActiveSec=1min
+Unit=lm-studio-cli-server.service
+
+[Install]
+WantedBy=timers.target

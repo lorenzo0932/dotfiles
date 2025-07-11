@@ -1,0 +1,12 @@
+[Unit]
+Description=Aggiornamento automatico dei Flatpak con notifica
+
+[Service]
+Type=oneshot
+# Notifica l’utente 5 minuti prima dell’aggiornamento
+ExecStartPre=/usr/bin/notify-send "Aggiornamento Flatpak" "Gli aggiornamenti verranno eseguiti tra 5 minuti..."
+ExecStartPre=/bin/sleep 300
+# Esegue l’aggiornamento in modalità non interattiva
+ExecStart=/usr/bin/flatpak update --noninteractive --assumeyes
+# Notifica l’utente al termine dell’aggiornamento
+ExecStartPost=/usr/bin/notify-send "Aggiornamento Flatpak" "Aggiornamenti completati"
