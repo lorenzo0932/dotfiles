@@ -4,7 +4,7 @@ This repository contains a collection of personal dotfiles, shell scripts, and c
 
 ## Notes on Commit Messages
 
-The commit messages in this repository are automatically generated using a local Large Language Model (LLM). Therefore, they may not always be fully reliable or perfectly consistent with the actual changes made in the commits. Please refer to the code itself for the most accurate understanding of modifications.
+The commit messages in this repository are automatically generated using a Large Language Model (Gemini 2.5 Flash). Therefore, they may not always be fully reliable or perfectly consistent with the actual changes made in the commits. Please refer to the code itself for the most accurate understanding of modifications.
 
 ## Features
 
