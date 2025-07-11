@@ -50,7 +50,7 @@ Here's an overview of the main directories and their contents:
 
 ## Usage and Installation
 
-This repository is a collection of personal dotfiles and scripts. To use them, you typically clone the repository and then symlink or copy the relevant files to their respective locations in your home directory (e.g., `~/.config/mpv/`, `~/.local/share/nautilus/scripts/`, `~/.config/systemd/user/`).
+This repository is a collection of personal dotfiles and scripts. Since this is a repo designed for personal use, the guide and particularly the paths described depend on your system or configuration of it. To use them, clone the repository and then symlink or copy the relevant files to their respective locations in your home directory (e.g., `~/.config/mpv/`, `~/.local/share/nautilus/scripts/`, `~/.config/systemd/user/`).
 
 **General Steps:**
 
@@ -66,6 +66,8 @@ This repository is a collection of personal dotfiles and scripts. To use them, y
     *   For `mpv` configurations:
         ```bash
         ln -sfn ~/Documenti/GitHub/dotfiles/myScript/mpv ~/.config/mpv
+        #If flatpak is used:
+        ln -sfn ~/Documenti/GitHub/dotfiles/myScript/mpv-flatpak ~/.var/mpv
         ```
     *   For `nautilus` scripts:
         ```bash
@@ -82,7 +84,7 @@ This repository is a collection of personal dotfiles and scripts. To use them, y
 
 **Specific Configurations:**
 
-*   **AniDownloader**: Refer to `myScript/downloadAnime/AniDownloader_README.md` for detailed setup, dependencies, and configuration of `series_data.json`.
+*   **AniDownloader**: Refer to [AniDownloader_README](https://github.com/lorenzo0932/dotfiles/blob/main/myScript/downloadAnime/AniDownloader_README.md).md for detailed setup, dependencies, and configuration of `series_data.json`.
 *   **MPV Shaders**: Ensure your MPV installation supports GLSL shaders. The shaders are located in `myScript/mpv/shaders/`.
 *   **Nautilus Scripts**: After symlinking, you might need to restart Nautilus (`nautilus -q` and then reopen) or log out/in for the scripts to appear in the context menu.
 *   **Systemd Services**: After enabling services/timers, you can check their status with `systemctl --user status <service_name>`.
