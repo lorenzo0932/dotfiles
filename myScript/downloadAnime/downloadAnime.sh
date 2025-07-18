@@ -5,280 +5,300 @@ import re
 import requests
 import subprocess
 import sys
-from pathlib import Path
 import shutil
 import time
 import multiprocessing as mp
 import json
+import logging
+from pathlib import Path
 
+# --- CONFIGURAZIONE ---
+JSON_FILE_PATH = 'series_data.json'
+LOG_FILE = 'serie_critical_errors.log'
 
-# --- Caricamento dati delle serie dal file JSON ---
-JSON_FILE_PATH = 'series_data.json' # Definisci il percorso del file JSON
+def check_dependencies():
+    if not shutil.which("aria2c"):
+        print("ERRORE: 'aria2c' non trovato.")
+        sys.exit(1)
+    if not shutil.which("ffmpeg"):
+        print("ERRORE: 'ffmpeg' non trovato.")
+        sys.exit(1)
+    print("✅ Dipendenze trovate.")
 
-try:
-    with open(JSON_FILE_PATH, 'r', encoding='utf-8') as f: # Apri il file in lettura ('r') con encoding UTF-8
-        series_list = json.load(f) # Carica i dati JSON in una variabile Python
-except FileNotFoundError:
-    print(f"Errore: File JSON '{JSON_FILE_PATH}' non trovato.")
-    sys.exit(1) # Esce dallo script se il file non viene trovato
-except json.JSONDecodeError as e:
-    print(f"Errore: Il file JSON '{JSON_FILE_PATH}' non è formattato correttamente.")
-    print(f"Dettagli errore: {e}")
-    sys.exit(1) # Esce dallo script se il JSON è invalido
-except Exception as e:
-    print(f"Errore inaspettato durante la lettura del file JSON: {e}")
-    sys.exit(1)
-# ----------------------------------------------------
+def load_series_data():
+    try:
+        with open(JSON_FILE_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"ERRORE: {e}")
+        sys.exit(1)
 
-
-def get_next_episode(series_path):
-    """
-        Cerca nella cartella indicata (non ricorsivamente) tutti i file .mp4 e restituisce il numero
-        dell'episodio successivo da scaricare (max trovato + 1). Se non vengono trovati file, restituisce 1.
-        """
-    files = os.listdir(series_path)
+def get_next_episode_num(series_path):
+    if not os.path.exists(series_path):
+        os.makedirs(series_path)
     max_ep = 0
-    for file in files:
-        if file.endswith('.mp4'):
-            # Estrae il numero dell'episodio cercando la stringa "Ep_" seguita da uno o più numeri
-            match = re.search(r'Ep_(\d+)', file)
+    for filename in os.listdir(series_path):
+        if filename.endswith(('.mp4', '.mkv')):
+            match = re.search(r'[._-]Ep[._-]?(\d+)', filename, re.IGNORECASE)
             if match:
                 ep_num = int(match.group(1))
-                if ep_num > max_ep:
-                    max_ep = ep_num
-    return max_ep + 1 if max_ep > 0 else 1
+                max_ep = max(max_ep, ep_num)
+    return max_ep + 1
 
+def format_episode_number(ep_num):
+    return f"{ep_num:02d}"
 
-def format_episode_number(ep):
-    """
-        Formattta il numero dell'episodio:
-        - Se è inferiore a 10, restituisce una stringa con padding (es. "01")
-        - Altrimenti restituisce la stringa senza padding (es. "10")
-        """
-    return f"{ep:02d}" if ep < 10 else str(ep)
-
-
-def download_episode_with_aria2(series):
-    """
-        Costruisce l'URL di download sostituendo il placeholder {ep} nel pattern, quindi
-        utilizza aria2c per scaricare il file in parallelo.
-        Gestisce anche il rinomino dei file in caso di 'continue' attivo.
-        """
+def plan_series_task(series):
     name = series["name"]
     path = series["path"]
     link_pattern = series["link_pattern"]
-    is_continuation = series.get("continue", False)  # Default to False if not present
-    passed_episodes = series.get("passed_episodes", 0)  # Default to 0 if not present
+    is_continuation = series.get("continue", False)
+    passed_episodes = series.get("passed_episodes", 0)
 
-    # Calcola il prossimo episodio da scaricare (numerazione interna alla stagione) e se è una continuazione il numero finale è calcolato in base al numero di episodi passati
-    if is_continuation:
-        final_ep_number = get_next_episode(path)
-        if final_ep_number <= passed_episodes:
-            final_ep_number = passed_episodes + 1
-        print(f"{final_ep_number} {passed_episodes}")
-        next_ep_download = final_ep_number - passed_episodes
-    else :
-        next_ep_download = get_next_episode(path)
-        ep_str_download = format_episode_number(next_ep_download)
+    final_ep_number = get_next_episode_num(path)
+    if is_continuation and final_ep_number <= passed_episodes:
+        final_ep_number = passed_episodes + 1
+    next_ep_download = final_ep_number if not is_continuation else final_ep_number - passed_episodes
 
-    # Costruisce l'URL sostituendo il placeholder con la numerazione per il download
     ep_str_download = format_episode_number(next_ep_download)
     download_url = link_pattern.format(ep=ep_str_download)
-    print(f"[{name} Tentativo di download episodio {next_ep_download} (download num) -> URL: {download_url}")
 
-    # Estrae il nome del file dalla URL
-    downloaded_file_name = download_url.split("/")[-1]
-    output_file_path_download = os.path.join(path, downloaded_file_name)
+    task = {
+        "series": series,
+        "action": "skip",
+        "reason": "URL non raggiungibile.",
+        "download_url": download_url,
+        "next_ep_download": next_ep_download,
+        "final_ep_number": final_ep_number
+    }
 
-    # Costruisce il comando aria2c; -x e -s definiscono il numero di connessioni parallelle
-    cmd = ["aria2c", "-x", "16", "-s", "16", "-o", downloaded_file_name, download_url]
-    print(f"[{name}] Avvio aria2c per il download: {' '.join(cmd)}")
-
-    # Imposta la directory corrente per il comando in modo che il file venga salvato in 'path'
-    start_time = time.time()
-    result = subprocess.run(cmd, cwd=path)
-    end_time = time.time()
-    download_time = end_time - start_time
-
-    if result.returncode == 0:
-        print(f"[{name}] Episodio {next_ep_download} (download num) scaricato con successo!")
-
-        final_file_path = output_file_path_download  # Initialize with download path
-
-        if is_continuation:
-            # Calcola il numero di episodio finale (considerando gli episodi precedenti)
-            ep_str_final = format_episode_number(final_ep_number)
-
-            # Costruisci il nome file finale basato sul pattern e il numero episodio finale
-            base_filename = downloaded_file_name.replace(f"_Ep_{ep_str_download}",
-                                                           f"_Ep_{ep_str_final}")  # Simple replace, might need more robust logic if filenames are very different
-
-            final_file_path = os.path.join(path, base_filename)
-
-            # Rinomina il file
-            try:
-                os.rename(output_file_path_download, final_file_path)
-                print(f"[{name}] File rinominato in: {final_file_path}")
-            except OSError as e:
-                print(f"[{name}] Errore durante il rinomino del file: {e}")
-                return None, None  # Return None to indicate failure
-
-        return final_file_path, download_time
-    else:
-        print(f"[{name}] Download fallito con aria2c (return code: {result.returncode}).")
-        return None, None
-
-
-def convertToH265(episode_path):
-    # Salvo il nome del file
-    file_basename = os.path.basename(episode_path)
-
-    # Imposta la variabile di ambiente che si aspetta Nautilus
-    env = os.environ.copy()
-    env["NAUTILUS_SCRIPT_SELECTED_FILE_PATHS"] = episode_path
-
-    # Specifica il path dello scritp Nautilus. Lo script converte il file, verifica la conversione ed elimina l'originale.
-    script_path = "./Converti e verifica.sh"
-
-    # Verifico che lo script da eseguire esista e sia eseguibile
-    if not os.path.isfile(script_path):
-        print(f"Lo script {script_path} non esiste")
-        return None, None
-
-    if not os.access(script_path, os.X_OK):
-        print(f"Lo script {script_path} non è eseguibile")
-        return None, None
-
-    success = 0
-    count = 1
-    start_time = time.time()
-    while success == 0 and count <= 2:
-        # Avvia lo script passando l'ambiente con la variabile di ambiente impostata in precedenza
-        result = subprocess.run([script_path], env=env)
-        # Se il file non è stato eliminato secondo le specifiche di Converti e Verifica.sh allora la conversione è fallita
-        if os.path.exists(episode_path):
-            print("Conversione fallita, riprova")
-            count = count + 1
-        else:
-            success = 1
-    end_time = time.time()
-    conversion_time = end_time - start_time
-
-    if success == 0:
-        print("Errore: conversione non riuscita dopo 3 tentativi")
-        return None, None
-
-    # Se la conversione è avvenuta con successo, sposta il file convertito nella directory corretta
-    converted_file_path = f"/run/media/lorenzo/SSD Sata/Convertiti/{file_basename}"
-    shutil.move(converted_file_path, episode_path)
-    return True, conversion_time
-
-
-def process_series(series):
-    """
-    Processa una singola serie: download e conversione.
-    Restituisce un dizionario con i risultati.
-    """
-    name = series["name"]
-    print(f"Inizio processo per la serie: {name}")
     try:
-        # Scarica un episodio se necessario e lo converte in h265
-        Episode, download_time = download_episode_with_aria2(series)
-
-        if Episode:
-            conversion_result, conversion_time = convertToH265(Episode)
-            return {
-                "name": name,
-                "episode": Episode,
-                "download_time": download_time,
-                "conversion_result": conversion_result,
-                "conversion_time": conversion_time
-            }
+        response = requests.head(download_url, timeout=10, allow_redirects=True)
+        if response.status_code == 200:
+            task["action"] = "process"
+            task["reason"] = f"Pronto per scaricare Ep. {final_ep_number}"
         else:
-            return {
-                "name": name,
-                "episode": None,
-                "download_time": 0,
-                "conversion_result": False,
-                "conversion_time": 0
-            }
-    except Exception as e:
-        print(f"Errore durante il processamento della serie {name}: {e}")
-        return {
-            "name": name,
-            "episode": None,
-            "download_time": 0,
-            "conversion_result": False,
-            "conversion_time": 0,
-            "error": str(e)
-        }
+            task["reason"] = f"HTTP {response.status_code}"
+    except requests.RequestException:
+        pass
 
+    return task
+
+def log_critical_error(message):
+    with open(LOG_FILE, 'a') as log:
+        log.write(f"[{time.ctime()}] {message}\n")
+
+def download_episode(task, status_dict):
+    series = task["series"]
+    name = series["name"]
+    path = series["path"]
+    download_url = task["download_url"]
+    
+    status_dict[name] = f"Download Ep. {task['final_ep_number']}"
+    
+    downloaded_file_name = download_url.split("/")[-1].split("?")[0]
+    output_file_path = Path(path) / downloaded_file_name
+
+    cmd = [
+        "aria2c", "-x", "16", "-s", "16",
+        "--summary-interval=1", 
+        "-o", str(output_file_path.name), download_url
+    ]
+
+    start_time = time.time()
+    process = subprocess.Popen(
+        cmd, cwd=path,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True
+    )
+
+    try:
+        while True:
+            line = process.stdout.readline()
+            if not line:
+                break
+            #print(f"aria2c: {line.strip()}")
+            #match = re.search(r'\s(\d+)%', line)
+            match = re.search(r'\((\d+)%\)', line)
+            if match:
+                percent = match.group(1)
+                status_dict[name] = f"Download Ep. {task['final_ep_number']} - {percent}%"
+    except Exception as e:
+        process.kill()
+        raise Exception(f"Errore durante lettura stdout: {e}")
+
+    process.wait()
+    end_time = time.time()
+
+    if process.returncode != 0:
+        logging.error(f"[{name}] aria2c ha fallito. Codice: {process.returncode}")
+        raise Exception("aria2c ha fallito. Controlla il log per dettagli.")
+
+    final_file_path = output_file_path
+    if series.get("continue", False):
+        ep_str_download = format_episode_number(task["next_ep_download"])
+        ep_str_final = format_episode_number(task["final_ep_number"])
+        
+        new_filename = re.sub(f'Ep[._-]?{ep_str_download}', f'Ep_{ep_str_final}', output_file_path.name, flags=re.IGNORECASE)
+        final_file_path = output_file_path.with_name(new_filename)
+        os.rename(output_file_path, final_file_path)
+
+    return str(final_file_path), end_time - start_time
+
+def convert_and_verify(file_path, status_dict, name, max_retries=3):
+    output_dir = "/home/lorenzo/Video/Convertiti"
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, os.path.basename(file_path))
+    log_path = f"{output_path}.log"
+
+    for attempt in range(1, max_retries + 1):
+        status_dict[name] = f"Conversione - tentativo {attempt}"
+        start_time = time.time()
+        try:
+            cmd = [
+                "nice", "-n", "5", "ffmpeg", "-y", "-i", file_path,
+                "-c:v", "libx265", "-crf", "23", "-preset", "veryfast",
+                "-threads", "12", "-x265-params", "hist-scenecut=1",
+                "-c:a", "copy", output_path
+            ]
+
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            total_duration = None
+            pattern_dur = re.compile(r'Duration: (\d+):(\d+):(\d+).(\d+)')
+            pattern_time = re.compile(r'time=(\d+):(\d+):(\d+).(\d+)')
+
+            while True:
+                line = proc.stdout.readline()
+                if not line:
+                    break
+
+                if total_duration is None:
+                    match_dur = pattern_dur.search(line)
+                    if match_dur:
+                        h, m, s, ms = map(int, match_dur.groups())
+                        total_duration = h * 3600 + m * 60 + s + ms / 100
+
+                match_time = pattern_time.search(line)
+                if match_time and total_duration:
+                    h, m, s, ms = map(int, match_time.groups())
+                    current_time = h * 3600 + m * 60 + s + ms / 100
+                    percent = min(100, int((current_time / total_duration) * 100))
+                    status_dict[name] = f"Conversione - {percent}%"
+
+            proc.wait()
+
+            # Verifica
+            verify = subprocess.run([
+                "nice", "-n", "5", "ffmpeg", "-y", "-v", "error", "-i",
+                output_path, "-f", "null", "-"
+            ], stderr=open(log_path, "w"))
+
+            end_time = time.time()
+
+            if os.path.getsize(log_path) == 0:
+                # Conversione ok
+                os.remove(log_path)
+                os.remove(file_path)
+                shutil.move(output_path, file_path)
+                return True, end_time - start_time
+            else:
+                # Errore, cancella output e riprova
+                os.remove(output_path)
+                # Non stampiamo nulla, solo aggiorniamo status_dict con tentativo
+                continue
+
+        except Exception as e:
+            # Qui puoi anche decidere se loggare o ignorare
+            continue
+
+    # Se siamo qui, dopo tutti i tentativi
+    status_dict[name] = "❌ Conversione fallita"
+    log_critical_error(f"Errore nella conversione/verifica: {os.path.basename(file_path)}")
+    raise Exception("Errore nella conversione dopo vari tentativi")
+
+def process_series_worker(task, status_dict):
+    name = task["series"]["name"]
+    try:
+        episode_path, download_time = download_episode(task, status_dict)
+        result, conversion_time = convert_and_verify(episode_path, status_dict, name)
+        status_dict[name] = "✅ Fatto"
+        return {
+            "name": name, "episode": episode_path, "download_time": download_time,
+            "conversion_result": result, "conversion_time": conversion_time, "error": None
+        }
+    except Exception as e:
+        status_dict[name] = "❌ Errore"
+        log_critical_error(f"{name}: {str(e)}")
+        return {"name": name, "episode": None, "error": str(e)}
+
+def display_status(status_dict, tasks_names, start_time):
+    # Cancella schermo con ANSI escape
+    print("\033c", end="")  # Questo resetta lo schermo
+
+    elapsed = time.time() - start_time
+    print(f"--- Stato Attività (Tempo: {elapsed:.0f}s) ---")
+    for name in tasks_names:
+        try:
+            status = status_dict.get(name, '...')
+        except Exception:
+            status = '...'
+        print(f"- {name:<25} : {status}")
+    print("\nAttendere...")
+
+def main():
+    check_dependencies()
+    series_list = load_series_data()
+    start_time = time.time()
+
+    with mp.Pool(mp.cpu_count()) as pool:
+        planned_tasks = pool.map(plan_series_task, series_list)
+
+    to_process = [t for t in planned_tasks if t["action"] == "process"]
+    to_skip = [t for t in planned_tasks if t["action"] == "skip"]
+
+    print("\n--- Piano di Esecuzione ---")
+    if to_process:
+        for t in to_process:
+            print(f"📥 {t['series']['name']} - Ep. {t['final_ep_number']}")
+    else:
+        print("✅ Nessun nuovo episodio da scaricare.")
+
+    if to_skip:
+        print("\n🚫 Skip:")
+        for t in to_skip:
+            print(f"  - {t['series']['name']}: {t['reason']}")
+
+    if not to_process:
+        return
+
+    with mp.Manager() as manager:
+        status_dict = manager.dict()
+        names = [t['series']['name'] for t in to_process]
+
+        for name in names:
+            status_dict[name] = "In coda..."
+
+        with mp.Pool(mp.cpu_count()) as pool:
+            asyncs = [pool.apply_async(process_series_worker, args=(task, status_dict)) for task in to_process]
+
+            done = 0
+            while done < len(to_process):
+                display_status(status_dict, names, start_time)
+                done = sum(1 for r in asyncs if r.ready())
+                time.sleep(1)
+            results = [r.get() for r in asyncs]
+
+    display_status(status_dict, names, start_time)
+    end_time = time.time()
+
+    print("\n--- Resoconto Finale ---")
+    for r in results:
+        if r["error"]:
+            print(f"❌ {r['name']:<20} | Errore: {r['error']}")
+        else:
+            print(f"✅ {os.path.basename(r['episode']):<40} | DL: {r['download_time']:.2f}s | Conv: {r['conversion_time']:.2f}s")
+
+    print(f"\nTempo totale: {end_time - start_time:.2f} secondi")
 
 if __name__ == '__main__':
-    # Inizializzazione delle variabili per il resoconto
-    downloaded_episodes = []
-    conversion_successes = []
-    download_times = {}
-    conversion_times = {}
-    total_conversion_time = 0
-    total_download_time = 0
-    script_start_time = time.time()
-
-    # Utilizza un Pool di processi per eseguire il download e la conversione in parallelo
-    with mp.Pool(mp.cpu_count()) as pool:  # Utilizza tutti i core disponibili
-        results = pool.map(process_series, series_list)
-
-    # Elabora i risultati
-    for result in results:
-        if result["episode"]:
-            downloaded_episodes.append(result["episode"])
-            download_times[result["episode"]] = result["download_time"]
-            total_download_time += result["download_time"]
-
-            if result["conversion_result"]:
-                conversion_successes.append(result["episode"])
-                conversion_times[result["episode"]] = result["conversion_time"]
-                total_conversion_time += result["conversion_time"]
-            else:
-                conversion_successes.append(False)
-
-    script_end_time = time.time()
-    script_total_time = script_end_time - script_start_time
-
-    # Calcola la velocità media di download (se ci sono episodi scaricati)
-    if downloaded_episodes:
-        # Ottieni la dimensione totale dei file scaricati
-        total_size = sum([os.path.getsize(ep) for ep in downloaded_episodes])
-        average_download_speed = total_size / total_download_time if total_download_time > 0 else 0
-        # Converto da byte/secondo a MB/secondo
-        average_download_speed_mbps = average_download_speed / (1024 * 1024)
-    else:
-        average_download_speed_mbps = 0
-
-    # Stampa il resoconto
-    print("\n--- Resoconto ---")
-    print("Episodi scaricati:")
-    for episode in downloaded_episodes:
-        print(f"- {episode}")
-
-    print("\nStato conversioni:")
-    for episode in downloaded_episodes:
-        if episode in conversion_successes:
-            print(f"- {episode}: Successo")
-        else:
-            print(f"- {episode}: Fallimento")
-
-    print(f"\nVelocità media di download: {average_download_speed_mbps:.2f} MB/s")
-    print(f"Tempo totale di esecuzione dello script: {script_total_time:.2f} secondi")
-
-    print("\nDettagli tempi:")
-    print("- Tempi download per episodio:")
-    for episode, time in download_times.items():
-        print(f"  - {episode}: {time:.2f} secondi")
-
-    print("- Tempi conversione per episodio:")
-    for episode, time in conversion_times.items():
-        print(f"  - {episode}: {time:.2f} secondi")
-
-    print(f"- Tempo totale solo conversioni: {total_conversion_time:.2f} secondi")
-    print(f"- Tempo totale solo download: {total_download_time:.2f} secondi")
+    main()
