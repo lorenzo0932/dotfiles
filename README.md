@@ -36,7 +36,7 @@ This repository is a collection of personal dotfiles and scripts. Since this is 
     chmod +x installAll.sh
     ./InstallAll.sh
     ```
-    * If you want you can install only part of this project using the scripts that you can find in installationScripts
+    * If you want you can install only part of this project using the scripts that you can find in [installationScripts](https://github.com/lorenzo0932/dotfiles/tree/main/installationScripts)
 
 **Specific Configurations:**
 
