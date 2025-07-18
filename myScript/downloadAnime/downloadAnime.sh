@@ -17,11 +17,21 @@ JSON_FILE_PATH = 'series_data.json'
 LOG_FILE = 'serie_critical_errors.log'
 
 def check_dependencies():
+    missing_dependencies = []
     if not shutil.which("aria2c"):
-        print("ERRORE: 'aria2c' non trovato.")
-        sys.exit(1)
+        missing_dependencies.append("aria2c")
     if not shutil.which("ffmpeg"):
-        print("ERRORE: 'ffmpeg' non trovato.")
+        missing_dependencies.append("ffmpeg")
+
+    if missing_dependencies:
+        print(f"ERRORE: Le seguenti dipendenze non sono state trovate nel PATH: {', '.join(missing_dependencies)}.")
+        print("Questi sono strumenti a riga di comando e non possono essere installati tramite pip.")
+        print("Si prega di installarli manualmente utilizzando il gestore di pacchetti del sistema (es. apt, yum, brew, winget) o scaricando i binari.")
+        print("\nEsempi di installazione:")
+        print("  - Debian/Ubuntu: sudo apt install aria2 ffmpeg")
+        print("  - Fedora: sudo dnf install aria2 ffmpeg")
+        print("  - macOS (Homebrew): brew install aria2 ffmpeg")
+        print("  - Windows (Winget): winget install aria2; winget install ffmpeg")
         sys.exit(1)
     print("✅ Dipendenze trovate.")
 

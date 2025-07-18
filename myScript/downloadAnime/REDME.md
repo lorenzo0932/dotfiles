@@ -1,87 +1,77 @@
-# AniDownloader: Sistema di Download e Conversione Anime
+# AniDownloader: Anime Download and Conversion System
 
-Questo repository contiene uno script Python e i relativi file di configurazione e utility per automatizzare il download e la conversione degli episodi di anime.
+This repository contains a Python script and its related configuration files and utilities to automate the download and conversion of anime episodes.
 
-## 1. `downloadAnime.sh` (Script Principale)
+## 1. `downloadAnime.sh` (Main Script)
 
-Questo è lo script Python principale che gestisce l'intero processo di download e conversione degli episodi degli anime.
+This is the main Python script that manages the entire process of downloading and converting anime episodes.
 
-**Funzionalità principali:**
-- **Caricamento configurazione**: Legge i dati delle serie dal file `series_data.json` per sapere quali anime scaricare e dove salvarli.
-- **Determinazione prossimo episodio**: Identifica l'ultimo episodio scaricato in una cartella specifica e calcola il numero del prossimo episodio da scaricare.
-- **Download parallelo**: Utilizza `aria2c` per scaricare gli episodi in parallelo, ottimizzando la velocità di download.
-- **Gestione continuazione serie**: Supporta serie che si estendono su più stagioni, rinominando i file in base alla numerazione complessiva degli episodi.
-- **Conversione video**: Richiama lo script `Converti e verifica.sh` per convertire gli episodi scaricati in formato H.265, riducendo le dimensioni del file.
-- **Resoconto finale**: Al termine dell'esecuzione, fornisce un riepilogo dettagliato degli episodi scaricati, lo stato delle conversioni e i tempi impiegati per ogni operazione.
+**Main features:**
+- **Configuration loading**: Reads series data from the `series_data.json` file to know which anime to download and where to save them.
+- **Next episode determination**: Identifies the last downloaded episode in a specific folder and calculates the number of the next episode to download.
+- **Parallel download**: Uses `aria2c` to download episodes in parallel, optimizing download speed.
+- **Series continuation management**: Supports series that span multiple seasons, renaming files based on the overall episode numbering.
+- **Video conversion**: Uses ffmpeg for h.265 video conversion and post-conversion integrity verification.
+- **Final report**: At the end of execution, it provides a detailed summary of downloaded episodes, conversion status, and time taken for each operation.
 
-**Dipendenze:**
-- `python3`: Necessario per l'esecuzione dello script.
-- `aria2c`: Strumento da riga di comando per il download accelerato.
-- `ffmpeg`: Utilizzato dallo script `Converti e verifica.sh` per la conversione e verifica video.
+**Dependencies:**
+- `python3`: Required for script execution.
+- `aria2c`: Command-line tool for accelerated downloads.
+- `ffmpeg`: Used for video file conversion and verification after conversion.
 
-## 2. `series_data.json` (File di Configurazione)
+## 2. `series_data.json` (Configuration File)
 
-Questo file JSON è fondamentale per configurare le serie che `downloadAnime.sh` deve scaricare. **Non modificare direttamente `series_data.json` se non sai cosa stai facendo.**
+This JSON file is essential for configuring the series that `downloadAnime.sh` should download. **Do not directly modify `series_data.json` unless you know what you are doing.**
 
-Per aggiungere nuove serie o modificare quelle esistenti, fai riferimento al template `series_data_template.json`.
+To add new series or modify existing ones, refer to the `series_data_template.json` template.
 
-### Struttura degli oggetti serie:
+### Series object structure:
 
-Ogni oggetto all'interno dell'array JSON rappresenta una serie e deve contenere le seguenti proprietà:
+Each object within the JSON array represents a series and must contain the following properties:
 
-- **`name`**: Il nome completo della serie.
-- **`path`**: Il percorso locale completo dove gli episodi della serie verranno salvati, seguito dal numero della stagione (es: `/home/lorenzo/Video/Simulcast/NomeSerie/1`).
-- **`link_pattern`**: Il pattern del link di download della serie. È cruciale sostituire il numero dell'episodio con `{ep}`. Esempio: `https://srv16-suisen.sweetpixel.org/DDL/ANIME/SentaiDaishikkaku2/SentaiDaishikkaku2_Ep_{ep}_SUB_ITA.mp4`.
-- **`continue`**: (Opzionale) Un valore booleano (`true` o `false`). Imposta a `true` se la serie è una continuazione di una stagione precedente e la numerazione degli episodi deve tenere conto degli episodi già passati.
-- **`passed_episodes`**: (Obbligatorio se `continue` è `true`) Un numero intero che definisce il totale degli episodi delle stagioni precedenti già scaricate.
+- **`name`**: The full name of the series.
+- **`path`**: The full local path where the series episodes will be saved, followed by the season number (e.g., `/home/lorenzo/Video/Simulcast/SeriesName/1`).
+- **`link_pattern`**: The download link pattern for the series. It is crucial to replace the episode number with `{ep}`. Example: `https://srv16-suisen.sweetpixel.org/DDL/ANIME/SentaiDaishikkaku2/SentaiDaishikkaku2_Ep_{ep}_SUB_ITA.mp4`.
+- **`continue`**: (Optional) A boolean value (`true` or `false`). Set to `true` if the series is a continuation of a previous season and episode numbering should account for already passed episodes.
+- **`passed_episodes`**: (Required if `continue` is `true`) An integer defining the total number of episodes from previous seasons already downloaded.
 
-**Esempio di struttura:**
+**Example structure:**
 
 ```json
 [
     {
-        "name": "Nome Serie",
-        "path": "path_della_serie_locale/numero_stagione",
-        "link_pattern": "link_download_della_serie",
+        "name": "Series Name",
+        "path": "local_series_path/season_number",
+        "link_pattern": "series_download_link",
         "continue": true,
         "passed_episodes": 12
     },
     {
-        "name": "Nome Serie2",
-        "path": "path_della_serie_locale/numero_stagione",
-        "link_pattern": "link_download_della_serie"
+        "name": "Series Name2",
+        "path": "local_series_path/season_number",
+        "link_pattern": "series_download_link"
     }
 ]
 ```
 
-## 3. `series_data_template.json` (Template di Configurazione)
+## 3. `series_data_template.json` (Configuration Template)
 
-Questo file serve come modello per la creazione o la modifica del file `series_data.json`.
+This file serves as a template for creating or modifying the `series_data.json` file.
 
-**Istruzioni per l'utilizzo:**
-1.  Apri `series_data_template.json`.
-2.  **Elimina tutti i commenti** presenti nel file (le righe che iniziano con `//`).
-3.  Modifica il contenuto aggiungendo le informazioni relative alle tue serie, seguendo la "Struttura degli oggetti serie" descritta sopra.
-4.  Salva il file finale con il nome `series_data.json` (senza `_template`) nella stessa directory.
+**Instructions for use:**
+1. Open `series_data_template.json`.
+2. **Delete all comments** present in the file (lines starting with `//`).
+3. Modify the content by adding information related to your series, following the "Series object structure" described above.
+4. Save the final file with the name `series_data.json` (without `_template`) in the same directory.
 
-## 4. `Converti e verifica.sh` (Script di Utility)
+## 4. `AniDownloader.desktop` (Desktop Launcher)
 
-Questo script Bash è un'utility richiamata da `downloadAnime.sh` per la conversione e la verifica dei file video.
+This file is a desktop application for Linux systems (compatible with desktop environments like GNOME, KDE, etc.) that provides a simple way to launch the `downloadAnime.sh` script with a double click.
 
-**Funzionalità principali:**
-- **Conversione H.265**: Utilizza `ffmpeg` per convertire i file video in input nel codec H.265, ottimizzando le dimensioni del file mantenendo una buona qualità.
-- **Verifica integrità**: Dopo la conversione, `ffmpeg` viene utilizzato per verificare che il file convertito non contenga errori o corruzioni.
-- **Gestione errori**: Se la conversione o la verifica falliscono, il file originale non viene eliminato e il file convertito (se creato) viene rimosso.
-- **Rinomina e Spostamento**: In caso di successo, il file originale viene eliminato e il file convertito viene spostato nella directory corretta.
-
-## 5. `AniDownloader.desktop` (Lanciatore Desktop)
-
-Questo file è un'applicazione desktop per sistemi Linux (compatibile con ambienti desktop come GNOME, KDE, ecc.) che fornisce un modo semplice per avviare lo script `downloadAnime.sh` con un doppio click.
-
-**Dettagli:**
-- **`Name=AniDownloader`**: Il nome visualizzato dell'applicazione nel menu o sul desktop.
-- **`Comment=Scarica tutti gli anime in simulcast configurati`**: Una breve descrizione della sua funzione.
-- **`Path=/home/lorenzo/.local/share/myScript/downloadAnime/`**: Specifica la directory di lavoro da cui lo script `downloadAnime.sh` verrà eseguito.
-- **`Exec=sh -c './downloadAnime.sh'`**: Il comando effettivo che viene eseguito quando si avvia l'applicazione.
-- **`Icon=/home/lorenzo/.local/share/myScript/downloadAnime/logo.png`**: Il percorso dell'icona visualizzata per l'applicazione.
-- **`Terminal=true`**: Indica che l'applicazione deve essere eseguita all'interno di una finestra di terminale, permettendo di visualizzare l'output dello script.
+**Details:**
+- **`Name=AniDownloader`**: The displayed name of the application in the menu or on the desktop.
+- **`Comment=Downloads all configured simulcast anime`**: A brief description of its function.
+- **`Path=/home/lorenzo/.local/share/myScript/downloadAnime/`**: Specifies the working directory from which the `downloadAnime.sh` script will be executed.
+- **`Exec=sh -c './downloadAnime.sh'`**: The actual command that is executed when the application is launched.
+- **`Icon=/home/lorenzo/.local/share/myScript/downloadAnime/logo.png`**: The path to the icon displayed for the application.
+- **`Terminal=true`**: Indicates that the application should be run within a terminal window, allowing the script's output to be viewed.
