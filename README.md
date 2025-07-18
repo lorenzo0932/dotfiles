@@ -17,40 +17,9 @@ The commit messages in this repository are automatically generated using a Large
 *   **General Utility Scripts**: A collection of miscellaneous shell scripts for tasks like starting Home Assistant, creating test/corrupted videos, managing AI/ML servers (Ollama, Stable Diffusion WebUI, SwarmUI), and more.
 *   **File Synchronization**: rsync scripts for efficient file backup and synchronization with exclusion lists.
 
-## Project Structure
-
-Here's an overview of the main directories and their contents:
-
-*   `myScript/`: Contains a variety of general-purpose shell scripts.
-    *   `AvviaHomeAssistant.sh`: Script to start Home Assistant.
-    *   `crea_test_video.sh`, `Create_corrupted_video.sh`: Scripts for video testing.
-    *   `OllamaServer.sh`, `StableDiffusionWebUI.sh`, `SwarmUI.sh`: Scripts to manage AI/ML related servers.
-    *   `PopupDownloadFiniti.sh`: Script for download completion notifications.
-    *   `PostCambioRisoluzione.sh`, `PreCambioRisolzione.sh`: Scripts executed before/after display resolution changes.
-    *   `removeDKMS.sh`: Script to remove DKMS modules.
-    *   `toggle_pano.sh`: Script to toggle panorama mode.
-    *   `downloadAnime/`: **AniDownloader** - A dedicated system for automated anime downloads and video conversion. Refer to `myScript/downloadAnime/REDME.md` for detailed information on its setup and usage.
-    *   `ExportKeyboardShortcut/`: Scripts and configuration files for exporting and loading custom keyboard shortcuts.
-    *   `mpv/`: MPV media player configuration files, custom fonts, Lua scripts (uosc, thumbfast, dynamic-crop), and a comprehensive collection of Anime4K and FSRCNNX video shaders.
-    *   `rSync/`: rsync scripts for file synchronization and backups, including an `exclude.txt` for specifying files/directories to ignore.
-    *   `Script cambio schermo/`: Scripts to switch between different display outputs (e.g., `ReturnToDesktop.sh`, `ReturnToTV.sh`).
-    *   `search&Convert/`: Scripts for searching and converting video files.
-    *   `Yuzu/`: Scripts specifically designed to handle display resolution changes for the Yuzu emulator.
-*   `nautilus/`: Contains custom scripts integrated with the Nautilus file manager.
-    *   `scripts/`: Various shell scripts for video conversion (H.265, AV1, with/without subtitles, burn subtitles), video integrity verification, and opening files with MediaInfo, accessible via Nautilus context menus.
-*   `systemd/`: Systemd service and timer units for user-level automation.
-    *   `user/`: User-specific systemd units, including services and timers for:
-        *   `downloadAnime.service`/`downloadAnime.timer`: Automating anime downloads.
-        *   `flatpak-update.service`/`flatpak-update.timer`: Scheduled Flatpak updates.
-        *   `lmstudio.service`: Managing the LM Studio server.
-        *   `protonvpn_reconnect.service`: Ensuring ProtonVPN reconnection.
-        *   `rsync_sync.service`/`rsync_sync.timer`: Scheduled rsync synchronization.
-        *   `sunshine.service`: Managing the Sunshine streaming service.
-        *   `ytdlp2strm.service`: Service for youtube-dlp streaming.
-
 ## Usage and Installation
 
-This repository is a collection of personal dotfiles and scripts. Since this is a repo designed for personal use, the guide and particularly the paths described depend on your system or configuration of it. To use them, clone the repository and then symlink or copy the relevant files to their respective locations in your home directory (e.g., `~/.config/mpv/`, `~/.local/share/nautilus/scripts/`, `~/.config/systemd/user/`).
+This repository is a collection of personal dotfiles and scripts. Since this is a repo designed for personal use, the guide and particularly the paths described depend on your system or configuration of it. To use them, clone the repository and then symlink or copy (raccomanded) the relevant files to their respective locations in your home directory, (e.g., `~/.config/mpv/`, `~/.local/share/nautilus/scripts/`, `~/.config/systemd/user/`) or use the vary install scripts. 
 
 **General Steps:**
 
@@ -62,25 +31,12 @@ This repository is a collection of personal dotfiles and scripts. Since this is 
     ```bash
     cd ~/Documenti/GitHub/dotfiles
     ```
-3.  **Symlink or Copy Files:**
-    *   For `mpv` configurations:
-        ```bash
-        ln -sfn ~/Documenti/GitHub/dotfiles/myScript/mpv ~/.config/mpv
-        #If flatpak is used:
-        ln -sfn ~/Documenti/GitHub/dotfiles/myScript/mpv-flatpak ~/.var/mpv
-        ```
-    *   For `nautilus` scripts:
-        ```bash
-        ln -sfn ~/Documenti/GitHub/dotfiles/nautilus/scripts ~/.local/share/nautilus/scripts
-        ```
-    *   For `systemd` user units:
-        ```bash
-        ln -sfn ~/Documenti/GitHub/dotfiles/systemd/user ~/.config/systemd/user
-        systemctl --user daemon-reload
-        systemctl --user enable --now downloadAnime.timer rsync_sync.timer flatpak-update.timer
-        # Enable other services as needed, e.g., lmstudio.service, sunshine.service
-        ```
-    *   For other scripts in `myScript/`, you can either add `~/Documenti/GitHub/dotfiles/myScript/` to your `PATH` environment variable or create symlinks to individual scripts in a directory already in your `PATH` (e.g., `~/.local/bin/`).
+3.  **Install**
+    ```bash
+    chmod +x installAll.sh
+    ./InstallAll.sh
+    ```
+    * If you want you can install only part of this project using the scripts that you can find in installationScripts
 
 **Specific Configurations:**
 
@@ -104,5 +60,3 @@ Many scripts rely on common Linux utilities and applications. Ensure you have th
 *   `xrandr` (for display management scripts)
 
 This repository is continuously evolving with new scripts and configurations.
-
-This is a test 2
