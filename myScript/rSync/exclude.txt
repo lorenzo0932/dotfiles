@@ -3,3 +3,4 @@ tracker2-migration-complete
 series_data.json
 gemini.env
 *.log
+__pycache__
