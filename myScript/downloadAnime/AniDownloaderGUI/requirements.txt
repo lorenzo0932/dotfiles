@@ -1,4 +1,3 @@
 PyQt6
 psutil
 requests
-ffmpeg-python

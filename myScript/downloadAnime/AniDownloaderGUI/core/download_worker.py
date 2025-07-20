@@ -10,7 +10,7 @@ import json
 import logging
 from pathlib import Path
 from queue import Empty
-from PyQt6.QtCore import QObject, pyqtSignal, QTimer
+from PyQt6.QtCore import QObject, pyqtSignal, QThread, QTimer
 
 try:
     import psutil
@@ -114,56 +114,56 @@ class DownloadSignals(QObject):
 class DownloadWorker(QObject):
     def __init__(self, series_list, json_file_path=None, log_file_path=None, output_dir=None):
         super().__init__()
-        self._json_file_path = json_file_path or DEFAULT_JSON_FILE_PATH
-        self._log_file_path = log_file_path or DEFAULT_LOG_FILE
-        self._output_dir = output_dir or DEFAULT_OUTPUT_DIR
-        self._signals = DownloadSignals(); self._is_running = True
-        self._pool = self._manager = self._queue = self._stop_event = self._timer = None
-        self._active_tasks = []; self._active_tasks_info = []
+        self.json_file_path = json_file_path or DEFAULT_JSON_FILE_PATH
+        self.log_file_path = log_file_path or DEFAULT_LOG_FILE
+        self.output_dir = output_dir or DEFAULT_OUTPUT_DIR
+        self.signals = DownloadSignals(); self._is_running = True
+        self.pool = self.manager = self.queue = self.stop_event = self.timer = None
+        self.active_tasks = []; self.active_tasks_info = []
 
     def request_stop(self):
         self._is_running = False
-        if self._stop_event: self._stop_event.set()
+        if self.stop_event: self.stop_event.set()
 
     def _safe_shutdown(self):
-        if self._timer: self._timer.stop()
+        if self.timer: self.timer.stop()
         
-        for task_info in self._active_tasks_info:
-            self._signals.progress.emit(task_info['name'], "❌ Interrotto")
+        for task_info in self.active_tasks_info:
+            self.signals.progress.emit(task_info['name'], "❌ Interrotto")
 
-        self._signals.overall_status.emit("Interruzione forzata dei processi...")
-        if self._pool:
-            self._pool.terminate()
-            self._pool.join()
+        self.signals.overall_status.emit("Interruzione forzata dei processi...")
+        if self.pool:
+            self.pool.terminate()
+            self.pool.join()
         
         if psutil:
             for proc in psutil.process_iter(['name']):
                 try:
                     if proc.name().lower() in ["ffmpeg", "aria2c", "ffmpeg.exe", "aria2c.exe"]:
                         proc.kill()
-                        self._signals.overall_status.emit(f" - Ucciso processo: {proc.name()}")
+                        self.signals.overall_status.emit(f" - Ucciso processo: {proc.name()}")
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     pass
 
         self._cleanup_temp_files()
-        self._signals.overall_status.emit("Interruzione completata.")
+        self.signals.overall_status.emit("Interruzione completata.")
         if self.thread(): self.thread().quit()
 
     def _cleanup_temp_files(self):
-        self._signals.overall_status.emit("Pulizia file temporanei...")
-        for task_info in self._active_tasks_info:
+        self.signals.overall_status.emit("Pulizia file temporanei...")
+        for task_info in self.active_tasks_info:
             try:
                 series_path = Path(task_info["path"])
                 dl_filename = task_info["dl_url"].split("/")[-1].split("?")[0]
                 for file_to_remove in [
                     series_path / dl_filename, series_path / f"{dl_filename}.aria2c",
-                    Path(self._output_dir) / dl_filename, Path(self._output_dir) / f"{dl_filename}.log"
+                    Path(self.output_dir) / dl_filename, Path(self.output_dir) / f"{dl_filename}.log"
                 ]:
                     if file_to_remove.exists():
                         os.remove(file_to_remove)
-                        self._signals.overall_status.emit(f" - Rimosso: {file_to_remove.name}")
+                        self.signals.overall_status.emit(f" - Rimosso: {file_to_remove.name}")
             except Exception as e:
-                self._signals.error.emit("Cleanup", f"Errore pulizia: {e}")
+                self.signals.error.emit("Cleanup", f"Errore pulizia: {e}")
 
     def _check_queue(self):
         if not self._is_running:
@@ -172,17 +172,17 @@ class DownloadWorker(QObject):
 
         try:
             while True:
-                msg = self._queue.get_nowait()
+                msg = self.queue.get_nowait()
                 signal_type, *args = msg
-                if signal_type == 'progress': self._signals.progress.emit(*args)
-                elif signal_type == 'error': self._signals.error.emit(*args)
-                elif signal_type == 'finished': self._signals.finished.emit(*args)
+                if signal_type == 'progress': self.signals.progress.emit(*args)
+                elif signal_type == 'error': self.signals.error.emit(*args)
+                elif signal_type == 'finished': self.signals.finished.emit(*args)
         except Empty: pass
             
-        if all(r.ready() for r in self._active_tasks):
-            if self._timer: self._timer.stop()
-            if self._pool: self._pool.join()
-            if self._is_running: self._signals.overall_status.emit("Processo completato.")
+        if all(r.ready() for r in self.active_tasks):
+            if self.timer: self.timer.stop()
+            if self.pool: self.pool.join()
+            if self._is_running: self.signals.overall_status.emit("Processo completato.")
             if self.thread(): self.thread().quit()
 
     def run(self):
@@ -192,12 +192,12 @@ class DownloadWorker(QObject):
         except Exception:
             if self.thread(): self.thread().quit(); return
 
-        self._signals.overall_status.emit("Pianificazione attività...")
+        self.signals.overall_status.emit("Pianificazione attività...")
         try:
             with mp.Pool(processes=mp.cpu_count()) as pool:
                 planned_tasks = pool.map(plan_series_task, series_list)
         except Exception as e:
-            self._signals.error.emit("GLOBAL", f"Errore pianificazione: {e}")
+            self.signals.error.emit("GLOBAL", f"Errore pianificazione: {e}")
             if self.thread(): self.thread().quit(); return
 
         if not self._is_running:
@@ -205,41 +205,41 @@ class DownloadWorker(QObject):
 
         to_process = [t for t in planned_tasks if t["action"] == "process"]
         for t in [t for t in planned_tasks if t["action"] == "skip"]:
-            self._signals.task_skipped.emit(t['series']['name'], t['reason'])
+            self.signals.task_skipped.emit(t['series']['name'], t['reason'])
             
         if not to_process:
-            self._signals.overall_status.emit("✅ Nessun nuovo episodio da scaricare.")
+            self.signals.overall_status.emit("✅ Nessun nuovo episodio da scaricare.")
             if self.thread(): self.thread().quit(); return
         
-        self._signals.overall_status.emit(f"Avvio di {len(to_process)} download...")
+        self.signals.overall_status.emit(f"Avvio di {len(to_process)} download...")
         
-        self._active_tasks_info = [{"name": t["series"]["name"], "path": t["series"]["path"], "dl_url": t["download_url"]} for t in to_process]
+        self.active_tasks_info = [{"name": t["series"]["name"], "path": t["series"]["path"], "dl_url": t["download_url"]} for t in to_process]
 
-        self._manager = mp.Manager()
-        self._queue = self._manager.Queue()
-        self._stop_event = self._manager.Event()
-        self._pool = mp.Pool(processes=mp.cpu_count())
-        self._active_tasks = [self._pool.apply_async(process_series_worker_mp, args=(task, self._output_dir, self._log_file_path, self._queue, self._stop_event)) for task in to_process]
-        self._pool.close()
+        self.manager = mp.Manager()
+        self.queue = self.manager.Queue()
+        self.stop_event = self.manager.Event()
+        self.pool = mp.Pool(processes=mp.cpu_count())
+        self.active_tasks = [self.pool.apply_async(process_series_worker_mp, args=(task, self.output_dir, self.log_file_path, self.queue, self.stop_event)) for task in to_process]
+        self.pool.close()
         
-        self._timer = QTimer()
-        self._timer.timeout.connect(self._check_queue)
-        self._timer.start(250)
+        self.timer = QTimer()
+        self.timer.timeout.connect(self._check_queue)
+        self.timer.start(250)
 
     def _check_dependencies(self):
         if not psutil:
-            self._signals.error.emit("DEPENDENCIES", "Manca 'psutil'. Installalo con: pip install psutil")
+            self.signals.error.emit("DEPENDENCIES", "Manca 'psutil'. Installalo con: pip install psutil")
             return False
         missing = [dep for dep in ["aria2c", "ffmpeg"] if not shutil.which(dep)]
         if missing:
-            self._signals.error.emit("DEPENDENCIES", f"Mancanti: {', '.join(missing)}")
+            self.signals.error.emit("DEPENDENCIES", f"Mancanti: {', '.join(missing)}")
             return False
-        self._signals.overall_status.emit("✅ Dipendenze trovate."); return True
+        self.signals.overall_status.emit("✅ Dipendenze trovate."); return True
 
     def _load_series_data(self):
         try:
-            with open(self._json_file_path, 'r', encoding='utf-8') as f: return json.load(f)
-        except Exception as e: self._signals.error.emit("CONFIG", f"Errore caricamento: {e}"); raise
+            with open(self.json_file_path, 'r', encoding='utf-8') as f: return json.load(f)
+        except Exception as e: self.signals.error.emit("CONFIG", f"Errore caricamento: {e}"); raise
 
 def save_series_data(json_file_path, series_data):
     try:
