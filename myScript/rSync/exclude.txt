@@ -4,3 +4,5 @@ series_data.json
 gemini.env
 *.log
 __pycache__
+dist
+build
