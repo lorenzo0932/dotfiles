@@ -10,14 +10,14 @@ from PyQt6.QtGui import QPixmap
 class SeriesEditorDialog(QDialog):
     def __init__(self, series_data, is_new=False, parent=None):
         super().__init__(parent)
-        self.is_new = is_new
+        self._is_new = is_new
         title = "Aggiungi Nuova Serie" if is_new else f"Modifica: {series_data.get('name', 'N/A')}"
         self.setWindowTitle(title)
         self.setMinimumSize(500, 550)
         
-        self.series_data = series_data.copy()
-        self.result_data = None
-        self.is_deleted = False
+        self._series_data = series_data.copy()
+        self._result_data = None
+        self._is_deleted = False
 
         self._init_ui()
         self._populate_fields()
@@ -25,41 +25,41 @@ class SeriesEditorDialog(QDialog):
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
         
-        self.image_label = QLabel("Locandina non trovata")
-        self.image_label.setMinimumHeight(300)
-        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_label.setStyleSheet("border: 1px solid #ccc; background-color: #f0f0f0;")
-        main_layout.addWidget(self.image_label)
+        self._image_label = QLabel("Locandina non trovata")
+        self._image_label.setMinimumHeight(300)
+        self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._image_label.setStyleSheet("border: 1px solid #ccc; background-color: #f0f0f0;")
+        main_layout.addWidget(self._image_label)
 
         form_widget = QWidget()
         input_group_layout = QFormLayout(form_widget)
-        self.name_input = QLineEdit()
-        self.path_input = QLineEdit()
+        self._name_input = QLineEdit()
+        self._path_input = QLineEdit()
         path_layout = QHBoxLayout()
-        path_layout.addWidget(self.path_input)
+        path_layout.addWidget(self._path_input)
         path_browse_button = QPushButton("Sfoglia...")
         path_browse_button.clicked.connect(self._browse_series_path)
         path_layout.addWidget(path_browse_button)
-        self.link_pattern_input = QLineEdit()
-        self.continue_checkbox = QCheckBox()
-        self.passed_episodes_input = QSpinBox()
-        self.passed_episodes_input.setMinimum(0)
-        self.passed_episodes_input.setMaximum(999)
-        input_group_layout.addRow("Nome:", self.name_input)
+        self._link_pattern_input = QLineEdit()
+        self._continue_checkbox = QCheckBox()
+        self._passed_episodes_input = QSpinBox()
+        self._passed_episodes_input.setMinimum(0)
+        self._passed_episodes_input.setMaximum(999)
+        input_group_layout.addRow("Nome:", self._name_input)
         input_group_layout.addRow("Percorso:", path_layout)
-        input_group_layout.addRow("Pattern Link:", self.link_pattern_input)
-        input_group_layout.addRow("Continua:", self.continue_checkbox)
-        input_group_layout.addRow("Ep. Passati:", self.passed_episodes_input)
+        input_group_layout.addRow("Pattern Link:", self._link_pattern_input)
+        input_group_layout.addRow("Continua:", self._continue_checkbox)
+        input_group_layout.addRow("Ep. Passati:", self._passed_episodes_input)
         main_layout.addWidget(form_widget)
         
         main_layout.addStretch()
 
         button_layout = QHBoxLayout()
-        self.delete_button = QPushButton("Elimina Serie");
-        self.delete_button.setStyleSheet("background-color: #f44336; color: white; font-weight: bold;")
-        self.delete_button.clicked.connect(self._delete_series)
-        if self.is_new:
-            self.delete_button.hide()
+        self._delete_button = QPushButton("Elimina Serie");
+        self._delete_button.setStyleSheet("background-color: #f44336; color: white; font-weight: bold;")
+        self._delete_button.clicked.connect(self._delete_series)
+        if self._is_new:
+            self._delete_button.hide()
         
         save_button = QPushButton("Salva Modifiche");
         save_button.setDefault(True)
@@ -68,54 +68,54 @@ class SeriesEditorDialog(QDialog):
         cancel_button = QPushButton("Annulla");
         cancel_button.clicked.connect(self.reject)
         
-        button_layout.addWidget(self.delete_button)
+        button_layout.addWidget(self._delete_button)
         button_layout.addStretch(1)
         button_layout.addWidget(cancel_button)
         button_layout.addWidget(save_button)
         main_layout.addLayout(button_layout)
 
     def _populate_fields(self):
-        self.name_input.setText(self.series_data.get("name", ""))
-        self.path_input.setText(self.series_data.get("path", ""))
-        self.link_pattern_input.setText(self.series_data.get("link_pattern", ""))
-        self.continue_checkbox.setChecked(self.series_data.get("continue", False))
-        self.passed_episodes_input.setValue(self.series_data.get("passed_episodes", 0))
+        self._name_input.setText(self._series_data.get("name", ""))
+        self._path_input.setText(self._series_data.get("path", ""))
+        self._link_pattern_input.setText(self._series_data.get("link_pattern", ""))
+        self._continue_checkbox.setChecked(self._series_data.get("continue", False))
+        self._passed_episodes_input.setValue(self._series_data.get("passed_episodes", 0))
         self._load_poster()
 
     def _load_poster(self):
-        path = self.path_input.text()
+        path = self._path_input.text()
         if path and os.path.exists(os.path.dirname(path)):
             # **RIPRISTINATO:** Logica per la locandina corretta
             image_path = os.path.join(os.path.dirname(path), "folder.jpg")
             if os.path.exists(image_path) and (pixmap := QPixmap(image_path)) and not pixmap.isNull():
-                self.image_label.setPixmap(pixmap.scaled(self.image_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+                self._image_label.setPixmap(pixmap.scaled(self._image_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
             else:
-                self.image_label.setText("folder.jpg non trovato")
+                self._image_label.setText("folder.jpg non trovato")
         else:
-            self.image_label.setText("Specificare un percorso valido")
+            self._image_label.setText("Specificare un percorso valido")
             
     def _browse_series_path(self):
-        start_dir = self.path_input.text() if os.path.isdir(self.path_input.text()) else ""
+        start_dir = self._path_input.text() if os.path.isdir(self._path_input.text()) else ""
         selected_dir = QFileDialog.getExistingDirectory(self, "Seleziona Cartella Serie", start_dir)
         if selected_dir:
             # Aggiunge un file fittizio al percorso per coerenza con la logica `dirname`
-            self.path_input.setText(os.path.join(selected_dir, "dummyfile.mkv"))
+            self._path_input.setText(os.path.join(selected_dir, "dummyfile.mkv"))
             self._load_poster()
 
     def _save_changes(self):
-        confirm_text = "Sei sicuro di voler aggiungere questa nuova serie?" if self.is_new else "Sei sicuro di voler salvare le modifiche a questa serie?"
+        confirm_text = "Sei sicuro di voler aggiungere questa nuova serie?" if self._is_new else "Sei sicuro di voler salvare le modifiche a questa serie?"
         reply = QMessageBox.question(self, "Conferma", confirm_text,
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                      QMessageBox.StandardButton.No)
         if reply == QMessageBox.StandardButton.Yes:
-            self.result_data = {
-                "name": self.name_input.text().strip(),
-                "path": self.path_input.text().strip(),
-                "link_pattern": self.link_pattern_input.text().strip()
+            self._result_data = {
+                "name": self._name_input.text().strip(),
+                "path": self._path_input.text().strip(),
+                "link_pattern": self._link_pattern_input.text().strip()
             }
-            if self.continue_checkbox.isChecked():
-                self.result_data["continue"] = True
-                self.result_data["passed_episodes"] = self.passed_episodes_input.value()
+            if self._continue_checkbox.isChecked():
+                self._result_data["continue"] = True
+                self._result_data["passed_episodes"] = self._passed_episodes_input.value()
             
             self.accept()
 
@@ -124,8 +124,8 @@ class SeriesEditorDialog(QDialog):
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                      QMessageBox.StandardButton.No)
         if reply == QMessageBox.StandardButton.Yes:
-            self.is_deleted = True
+            self._is_deleted = True
             self.accept()
             
     def get_data(self):
-        return self.is_deleted, self.result_data
+        return self._is_deleted, self._result_data

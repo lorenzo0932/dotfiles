@@ -1,11 +1,8 @@
-import sys
 import os
-import platform
-import re
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
+    QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QTableWidget, QHeaderView, QFileDialog, QLabel,
-    QLineEdit, QMessageBox, QTextEdit, QStyle, QMenuBar, QSplitter, QTableWidgetItem
+    QLineEdit, QMessageBox, QTextEdit, QStyle, QMenuBar, QSplitter, QTableWidgetItem, QApplication
 )
 from PyQt6.QtCore import QThread, Qt, QSettings
 from PyQt6.QtGui import QIcon, QFont, QPixmap, QColor, QAction
@@ -17,16 +14,23 @@ class AniDownloaderGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("AniDownloader GUI")
-        self.setGeometry(100, 100, 900, 600)
+        # Calcola le dimensioni e la posizione per centrare la finestra
+        screen_geometry = QApplication.primaryScreen().geometry()
+        window_width = 1000 
+        window_height = 700 
+        x = (screen_geometry.width() - window_width) // 2
+        y = (screen_geometry.height() - window_height) // 2
+        self.setGeometry(x, y, window_width, window_height)
         self.setMinimumSize(800, 500)
+        
         self.setWindowIcon(QIcon('assets/logo.png'))
         self.settings = QSettings("MyScript", "AniDownloader")
         self.json_file_path = self.settings.value("json_file_path", DEFAULT_JSON_FILE_PATH)
         self.output_dir = self.settings.value("output_dir", DEFAULT_OUTPUT_DIR)
         self.log_file_path = self.settings.value("log_file_path", DEFAULT_LOG_FILE)
-        self.download_thread = None
-        self.download_worker = None
-        self.series_data = []
+        self._download_thread = None
+        self._download_worker = None
+        self._series_data = [] # Lasciato pubblico come richiesto
         self._init_ui()
         self._load_series_data_into_table()
 
@@ -85,8 +89,16 @@ class AniDownloaderGUI(QMainWindow):
         self.table_widget.setHorizontalHeaderLabels(["Nome Serie", "Stato"])
         header = self.table_widget.horizontalHeader()
         # **LA SOLUZIONE È QUI (Parte 1):** Imposta la modalità base su Interattiva
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        
+        # Set header alignment for both columns
+        self.table_widget.horizontalHeaderItem(0).setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table_widget.horizontalHeaderItem(1).setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # Centra i numeri di riga nell'intestazione verticale
+        self.table_widget.verticalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+
         self.table_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table_widget.setSortingEnabled(True)
         self.table_widget.itemSelectionChanged.connect(self._on_series_selected)
@@ -101,14 +113,14 @@ class AniDownloaderGUI(QMainWindow):
 
         self.log_output = QTextEdit(); self.log_output.setReadOnly(True); self.log_output.setFont(QFont("Monospace", 9))
         
-        main_splitter = QSplitter(Qt.Orientation.Vertical)
-        main_splitter.addWidget(top_container)
-        main_splitter.addWidget(self.log_output)
-        main_splitter.setSizes([450, 100])
-        main_splitter.setStretchFactor(0, 1)
-        main_splitter.setStretchFactor(1, 0)
+        self.main_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.main_splitter.addWidget(top_container)
+        self.main_splitter.addWidget(self.log_output)
+        self.main_splitter.setSizes([450, 0])
+        self.main_splitter.setStretchFactor(0, 1)
+        self.main_splitter.setStretchFactor(1, 0)
         
-        main_layout.addWidget(main_splitter)
+        main_layout.addWidget(self.main_splitter)
 
         self.overall_status_label = QLabel("Pronto."); self.overall_status_label.setFont(QFont("Sans Serif", 10, QFont.Weight.Bold))
         main_layout.addWidget(self.overall_status_label)
@@ -142,28 +154,31 @@ class AniDownloaderGUI(QMainWindow):
     def _load_series_data_into_table(self):
         try:
             worker = DownloadWorker(series_list=[], json_file_path=self.json_file_path)
-            self.series_data = worker._load_series_data()
+            self._series_data = worker._load_series_data()
         except Exception as e:
-            QMessageBox.critical(self, "Errore Caricamento Serie", f"Impossibile caricare: {e}"); self.series_data = []
-        self._populate_table_main_gui(self.series_data)
+            QMessageBox.critical(self, "Errore Caricamento Serie", f"Impossibile caricare: {e}"); self._series_data = []
+        self._populate_table_main_gui(self._series_data)
         self.table_widget.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
 
     def _populate_table_main_gui(self, data_to_display):
         self.table_widget.setRowCount(0)
         self.table_widget.setRowCount(len(data_to_display))
         for row, series in enumerate(data_to_display):
-            self.table_widget.setItem(row, 0, QTableWidgetItem(series["name"]))
-            self.table_widget.setItem(row, 1, StatusTableWidgetItem("In attesa", 3))
+            name_item = QTableWidgetItem(series["name"])
+            status_item = StatusTableWidgetItem("In attesa", 3)
+
+            # Set alignment for content of both columns
+            name_item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+            status_item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+
+            self.table_widget.setItem(row, 0, name_item)
+            self.table_widget.setItem(row, 1, status_item)
         if data_to_display: self.table_widget.selectRow(0)
         else: self._on_series_selected()
         
-        # **LA SOLUZIONE È QUI (Parte 2):** Applica il layout intelligente dopo aver caricato i dati
-        self.table_widget.resizeColumnsToContents()
-        self.table_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-
     def _reset_table_sort(self):
         self.table_widget.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
-        self._populate_table_main_gui(self.series_data)
+        self._populate_table_main_gui(self._series_data)
 
     def _on_series_selected(self):
         selected_items = self.table_widget.selectedItems()
@@ -172,7 +187,7 @@ class AniDownloaderGUI(QMainWindow):
         item = self.table_widget.item(row, 0)
         if not item: self.image_label.clear(); return
         
-        series = next((s for s in self.series_data if s.get("name") == item.text()), None)
+        series = next((s for s in self._series_data if s.get("name") == item.text()), None)
         if series and series.get("path"):
             series_path = series.get("path")
             image_path = os.path.join(os.path.dirname(series_path), "folder.jpg")
@@ -182,11 +197,12 @@ class AniDownloaderGUI(QMainWindow):
         else: self.image_label.clear(); self.image_label.setText("Percorso non definito")
 
     def start_download(self):
-        if self.download_thread and self.download_thread.isRunning(): return
-        if not self.series_data: return
+        if self._download_thread and self._download_thread.isRunning(): return
+        if not self._series_data: return
 
         self.table_widget.setSortingEnabled(False)
-
+        self.main_splitter.setSizes([450, 200])
+        
         for row in range(self.table_widget.rowCount()):
             self.table_widget.setItem(row, 1, StatusTableWidgetItem("In coda...", 2))
             self.table_widget.item(row, 1).setBackground(QColor(Qt.GlobalColor.transparent))
@@ -195,20 +211,20 @@ class AniDownloaderGUI(QMainWindow):
         self.refresh_button.setEnabled(False); self.json_path_input.setEnabled(False); self.output_dir_input.setEnabled(False)
         self.log_output.clear(); self.overall_status_label.setText("Avvio processo...")
 
-        self.download_thread = QThread()
-        self.download_worker = DownloadWorker(series_list=self.series_data, json_file_path=self.json_file_path, log_file_path=self.log_file_path, output_dir=self.output_dir)
-        self.download_worker.moveToThread(self.download_thread)
-        self.download_thread.started.connect(self.download_worker.run)
-        self.download_worker.signals.progress.connect(self._update_series_status)
-        self.download_worker.signals.error.connect(self._handle_worker_error)
-        self.download_worker.signals.finished.connect(self._handle_series_finished)
-        self.download_worker.signals.task_skipped.connect(self._handle_task_skipped)
-        self.download_worker.signals.overall_status.connect(self.overall_status_label.setText)
-        self.download_worker.signals.overall_status.connect(self.log_output.append)
-        self.download_thread.finished.connect(self._download_finished)
+        self._download_thread = QThread()
+        self._download_worker = DownloadWorker(series_list=self._series_data, json_file_path=self.json_file_path, log_file_path=self.log_file_path, output_dir=self.output_dir)
+        self._download_worker.moveToThread(self._download_thread)
+        self._download_thread.started.connect(self._download_worker.run)
+        self._download_worker._signals.progress.connect(self._update_series_status)
+        self._download_worker._signals.error.connect(self._handle_worker_error)
+        self._download_worker._signals.finished.connect(self._handle_series_finished)
+        self._download_worker._signals.task_skipped.connect(self._handle_task_skipped)
+        self._download_worker._signals.overall_status.connect(self.overall_status_label.setText)
+        self._download_worker._signals.overall_status.connect(self.log_output.append)
+        self._download_thread.finished.connect(self._download_finished)
         
         self.table_widget.sortByColumn(1, Qt.SortOrder.AscendingOrder)
-        self.download_thread.start()
+        self._download_thread.start()
 
     def stop_download(self):
         show_warning = self.settings.value("show_stop_warning", True, type=bool)
@@ -234,7 +250,9 @@ class AniDownloaderGUI(QMainWindow):
         
         for row in range(self.table_widget.rowCount()):
             if self.table_widget.item(row, 0).text() == series_name:
-                self.table_widget.setItem(row, 1, StatusTableWidgetItem(status_message, priority))
+                status_item = StatusTableWidgetItem(status_message, priority)
+                status_item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+                self.table_widget.setItem(row, 1, status_item)
                 self.table_widget.item(row, 1).setBackground(color)
                 break
         
@@ -262,6 +280,6 @@ class AniDownloaderGUI(QMainWindow):
         if "Interruzione" not in self.overall_status_label.text():
              self.overall_status_label.setText("Processo completato.")
         
-        if self.download_thread:
-            self.download_thread.quit(); self.download_thread.wait()
-        self.download_thread = None; self.download_worker = None
+        if self._download_thread:
+            self._download_thread.quit(); self._download_thread.wait()
+        self._download_thread = None; self._download_worker = None
