@@ -1,0 +1,9 @@
+[Unit]
+Description=Start HomeAssistant VM 3 minutes after user login
+
+[Timer]
+OnUnitActiveSec=3min
+Unit=HomeAssistant.service
+
+[Install]
+WantedBy=timers.target

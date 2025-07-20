@@ -1,0 +1,12 @@
+[Unit]
+Description=HomeAssistant VM Failure Recovery
+After=network.target
+Requires=graphical-session.target
+PartOf=HomeAssistant.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/lorenzo/.local/share/myScript/HandleHomeAssistantFailure.sh
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=Avvio automatico della VM "HomeAssistant" in modalità headless
+After=network.target vboxdrv.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/lorenzo/.local/share/myScript/AvviaHomeAssistant.sh
+RemainAfterExit=yes
+# Per spegnere la VM in maniera "pulita", puoi abilitare lo stop tramite ACPI:
+ExecStop=/usr/bin/VBoxManage controlvm "HomeAssistant" acpipowerbutton
+TimeoutStopSec=300
+
+[Install]
+WantedBy=default.target
+OnFailure=homeassistant-failure.service
