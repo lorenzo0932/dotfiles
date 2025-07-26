@@ -37,7 +37,7 @@ API_TYPE="google_ai"
 echo "Sincronizzazione dei file dotfiles..."
 rsync -au --delete --exclude-from='exclude.txt' "$MYSCRIPTS/" "$DEST/myScript/"
 rsync -au --delete --exclude-from='exclude.txt' "$NAUTILUS_SCRIPTS/" "$DEST/nautilus/"
-rsync -au --delete "$SYSTEMD_SERVICES/" "$DEST/systemd/"
+rsync -au --delete --exclude-from='exclude.txt' "$SYSTEMD_SERVICES/" "$DEST/systemd/"
 echo "Sincronizzazione completata."
 
 # --- Git Operations ---

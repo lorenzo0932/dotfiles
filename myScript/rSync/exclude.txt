@@ -5,4 +5,9 @@ gemini.env
 *.log
 __pycache__
 dist
+<<<<<<< HEAD
 build
+AniDownloader.*
+=======
+build
+>>>>>>> parent of 13b5cbc (Auto sync: aggiornamenti 2025-07-26 22:19:12)
