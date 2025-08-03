@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Blocco Schermo Automatico
+Comment=Blocca lo schermo dopo l'accesso per Sunshine/Moonlight
+Exec=/home/lorenzo/.local/share/myScript/Configurazione blocco schermo automatico/AvviaLockscreen.sh
+Icon=system-lock-screen
+Terminal=false
