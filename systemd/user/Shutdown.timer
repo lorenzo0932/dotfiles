@@ -1,0 +1,10 @@
+[Unit]
+Description=Run daily PC shutdown service at 3 AM
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+Unit=Shutdown.service
+
+[Install]
+WantedBy=timers.target

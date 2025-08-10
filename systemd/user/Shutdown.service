@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily PC Shutdown Service
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/shutdown -h now
+
+[Install]
+WantedBy=multi-user.target
