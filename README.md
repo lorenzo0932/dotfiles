@@ -11,11 +11,12 @@ The commit messages in this repository are automatically generated using a Large
 *   **Automated Anime Downloads & Conversion**: A comprehensive system for downloading anime episodes in parallel and converting them to H.265, with integrity verification.
 *   **MPV Player Enhancements**: Custom configurations for MPV, including advanced input bindings, UI scripts (uosc, thumbfast), and a wide array of Anime4K and FSRCNNX shaders for superior video playback.
 *   **Nautilus Context Menu Scripts**: Integration of various video conversion, verification, and media information scripts directly into the Nautilus file manager context menus for quick access.
-*   **Systemd User Services**: Automation of recurring tasks and application management through user-level systemd services and timers (e.g., anime downloads, Flatpak updates, rsync synchronization, LM Studio, Sunshine streaming).
+*   **Systemd User Services**: Automation of recurring tasks and application management through user-level systemd services and timers. This includes services for Home Assistant, LM Studio, Sunshine streaming, Flatpak updates, rsync synchronization, automatic screen locking, ProtonVPN reconnection, and system shutdown.
 *   **Display Management**: Scripts for switching display outputs (e.g., to TV, back to desktop) and handling resolution changes for specific applications like Yuzu.
 *   **Keyboard Shortcut Management**: Tools to export and load custom keyboard shortcuts.
-*   **General Utility Scripts**: A collection of miscellaneous shell scripts for tasks like starting Home Assistant, creating test/corrupted videos, managing AI/ML servers (Ollama, Stable Diffusion WebUI, SwarmUI), and more.
+*   **General Utility Scripts**: A collection of miscellaneous shell scripts for tasks like starting Home Assistant, creating test/corrupted videos, managing AI/ML servers (Ollama, Stable Diffusion WebUI, SwarmUI), handling Home Assistant failures, displaying download notifications, removing DKMS modules, and toggling panoramic display modes.
 *   **File Synchronization**: rsync scripts for efficient file backup and synchronization with exclusion lists.
+*   **Tuned Configuration**: Custom `tuned` profiles for aggressive performance optimization.
 
 ## Usage and Installation
 

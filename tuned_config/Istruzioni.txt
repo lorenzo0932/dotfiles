@@ -1,0 +1,16 @@
+Il profilo presente deve essere copiato in:
+/etc/tuned/profiles/performance-aggressivo
+quindi
+
+sudo cp -r performance-aggressivo /etc/tuned/profiles/performance-aggressivo
+
+
+Inoltre deve essere modifica il file ppd.conf in /etc/tuned/ppd.conf con quello presente in questa cartella. Cambia solo una riga ovvero:
+
+performance=performance-aggressivo
+
+Per farlo crea prima un backup del vecchio ppd.conf e copia quello nuovo nella posizione corretta:
+
+sudo mv /etc/tuned/ppd.conf /etc/tuned/ppd.conf.bak
+sudo cp ppd.conf /etc/tuned/ppd.conf
+
