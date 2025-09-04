@@ -40,7 +40,6 @@ This repository is a collection of personal dotfiles and scripts. Since this is 
 
 **Specific Configurations:**
 
-*   **AniDownloader**: Refer to [AniDownloader_README](https://github.com/lorenzo0932/dotfiles/blob/main/myScript/downloadAnime/AniDownloader_README.md).md for detailed setup, dependencies, and configuration of `series_data.json`.
 *   **MPV Shaders**: Ensure your MPV installation supports GLSL shaders. The shaders are located in `myScript/mpv/shaders/`.
 *   **Nautilus Scripts**: After symlinking, you might need to restart Nautilus (`nautilus -q` and then reopen) or log out/in for the scripts to appear in the context menu.
 *   **Systemd Services**: After enabling services/timers, you can check their status with `systemctl --user status <service_name>`.
