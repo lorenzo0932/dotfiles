@@ -3,11 +3,19 @@ Description=Lm Studio CLI Server
 After=network.target
 
 [Service]
-Type=simple
+Type=forking
 ExecStart=/home/lorenzo/.cache/lm-studio/bin/lms server start
 WorkingDirectory=/home/lorenzo/.cache/lm-studio/
+ExecStop=/bin/sh -c 'lms unload --all && lms server stop && killall -9 lm-studio'
 Restart=on-failure
-ExecStop=/bin/sh -c 'lms unload --all && lms server stop'
+RestartSec=15s
+
+# ATTENZIONE: Se possibile, trova il file PID!
+# Se il comando 'lms server start' crea un file .pid, specificalo qui.
+# Questo rende il servizio estremamente più affidabile. Cerca un file
+# come 'lmstudio.pid' o simile nella WorkingDirectory dopo aver avviato il server.
+# Esempio (DA DECOMMENTARE E MODIFICARE SE TROVI IL FILE):
+# PIDFile=/home/lorenzo/.cache/lm-studio/lmstudio.pid
 
 [Install]
 WantedBy=default.target
