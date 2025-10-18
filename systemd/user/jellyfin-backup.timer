@@ -1,0 +1,10 @@
+[Unit]
+Description=Esegue il backup di Jellyfin una volta a settimana
+
+[Timer]
+# Esegue ogni settimana, a mezzanotte tra Sabato e Domenica
+OnCalendar=Sun 00:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

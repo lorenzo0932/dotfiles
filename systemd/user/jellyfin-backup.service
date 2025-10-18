@@ -1,0 +1,9 @@
+[Unit]
+Description=Jellyfin Backup Service (eseguito da timer)
+
+[Service]
+Type=oneshot
+ExecStart=/home/lorenzo/.local/share/myScript/BackupJellfyfin/backupJellyfin.sh
+
+[Install]
+WantedBy=default.target
