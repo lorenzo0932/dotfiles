@@ -1,0 +1,12 @@
+[Unit]
+Description=Xbox Controller Monitor for GNOME Wayland
+After=graphical-session-pre.target
+
+[Service]
+Type=simple
+ExecStart=/home/lorenzo/.local/share/myScript/GameMode/openSteamAtConnection.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=graphical-session.target
