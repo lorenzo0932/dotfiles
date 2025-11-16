@@ -53,7 +53,7 @@ class XboxControllerMonitor:
     def launch_steam_big_picture(self):
         """Lancia Steam in Big Picture mode"""
         try:
-            subprocess.Popen(["steam"], 
+            subprocess.Popen(["/usr/bin/steam", "%U"], 
                            stdout=subprocess.DEVNULL, 
                            stderr=subprocess.DEVNULL)
             logging.info("Steam Big Picture lanciato")
