@@ -72,7 +72,7 @@ class XboxControllerMonitor:
     def close_applications(self):
         """Chiude le applicazioni specificate prima di avviare Steam."""
         logging.info("Chiusura applicazioni in corso...")
-        apps_to_kill = ["zen", "firefox-bin", "code", "Telegram", "jellyfinmediaplayer"]
+        apps_to_kill = ["zen", "firefox-bin", "code", "Telegram", "jellyfin-desktop"]
         for app in apps_to_kill:
             try:
                 subprocess.run(["/usr/bin/killall", "-s", "9", app], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
