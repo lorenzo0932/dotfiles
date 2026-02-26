@@ -8,7 +8,7 @@
 
 # --- CONFIGURAZIONE ---
 SOURCE_DIR="$HOME/.var/app/org.jellyfin.JellyfinServer/"
-DB_FILE_PATH="$SOURCE_DIR/data/jellyfin/data/library.db"
+DB_FILE_PATH="$SOURCE_DIR/data/jellyfin/data/jellyfin.db"
 BACKUP_PARENT_DIR="/run/media/lorenzo/SSD2/JellyfinUserBackup"
 RETENTION_COUNT=4
 # --- FINE CONFIGURAZIONE ---
