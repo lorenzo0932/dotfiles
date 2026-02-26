@@ -27,7 +27,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT # Pulizia automatica all'uscita
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
 CURRENT_BACKUP_DIR="$BACKUP_PARENT_DIR/backup-$TIMESTAMP"
 LATEST_LINK="$BACKUP_PARENT_DIR/latest"
-DB_SNAPSHOT_PATH="$TMP_DIR/library.db.snapshot"
+DB_SNAPSHOT_PATH="$TMP_DIR/jellyfin.db.snapshot"
 
 echo ">>> Avvio backup 'live' di Jellyfin..."
 
@@ -56,10 +56,10 @@ else
 fi
 
 # Sovrascrivi il database nel nuovo backup con lo snapshot sicuro
-rsync -a "$DB_SNAPSHOT_PATH" "$CURRENT_BACKUP_DIR/data/jellyfin/data/library.db"
+rsync -a "$DB_SNAPSHOT_PATH" "$CURRENT_BACKUP_DIR/data/jellyfin/data/jellyfin.db"
 echo "--> Backup completato in '$CURRENT_BACKUP_DIR'"
 
-# 3. Aggiorna il link 'latest' e pulisci i vecchi backup
+# 3. Aggiornamento del link 'latest' e pulizia dei vecchi backup
 echo "--> 3/3: Aggiornamento del link 'latest' e pulizia dei vecchi backup..."
 rm -f "$LATEST_LINK"
 ln -s "$CURRENT_BACKUP_DIR" "$LATEST_LINK"

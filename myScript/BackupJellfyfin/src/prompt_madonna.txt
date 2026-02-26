@@ -1,0 +1,18 @@
+# Prompt per generazione immagine della Madonna
+   # Stile: Rinascimento italiano, olio su tela
+   # Composizione: Madonna col Bambino in trono, con i santi Giuseppe e Caterina d'Alessandria
+   # Colori: Tono dorato, sfumature di oro e azzurro cielo
+   # Luce: Naturalistica, con un bagliore delicato sul volto della Vergine
+   # Stile artistico: Raffaello Sanzio o Caravaggio (con tocco più drammatico)
+   # Dettagli aggiuntivi:
+   # - Abiti riccamente decorati con stoffe preziose e gioielli
+   # - Bambino che tiene un libro aperto o una rosa
+   # - Sfondo: Cielo sereno o architettura gotica (ad esempio, la Basilica di Santa Maria Maggiore)
+   # Dimensioni: 1024x768 pixel
+
+   Prompt completo:
+   "Una Madonna col Bambino in trono, con i santi Giuseppe e Caterina d'Alessandria,
+   stile Rinascimento italiano, olio su tela. Colori dorati e azzurri, luce naturale.
+   Dettagli artistici raffinati: abiti riccamente decorati, gioielli scintillanti,
+   bambino che tiene un libro aperto o una rosa. Sfondo: cielo sereno o architettura gotica.
+   Stile: Raffaello Sanzio o Caravaggio (con tocco drammatico). Dimensioni: 1024x768."
