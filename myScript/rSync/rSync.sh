@@ -21,8 +21,8 @@ DEST="/home/lorenzo/Documenti/GitHub/dotfiles"
 # Assicurati che il file ~/.config/google-ai-api-key.txt sia escluso dal tuo .gitignore.
 GOOGLE_API_KEY="${GOOGLE_API_KEY}" # Sostituisci o carica da env
 
-# Modello specifico di Gemini da utilizzare (ora aggiornato a gemini-2.5-flash)
-LLM_MODEL="gemini-2.5-flash"
+# Modello specifico di Gemini da utilizzare (ora aggiornato a gemini-3-flash-preview)
+LLM_MODEL="gemini-3-flash-preview"
 API_URL="https://generativelanguage.googleapis.com/v1beta/models/$LLM_MODEL:generateContent"
 API_TYPE="google_ai"
 
