@@ -1,6 +1,10 @@
 #!/bin/bash
 # AniEngine Burst - (v18.5 - Ultra-Adaptive)
 
+# Abilita il Job Control (monitor mode) per far funzionare correttamente il comando 'jobs'
+# all'interno dell'ambiente non interattivo di Nautilus
+set -m
+
 # Forza lo standard internazionale per evitare il bug dei decimali (virgola vs punto)
 export LC_NUMERIC=C
 START_TIME=$(date +%s)
@@ -97,7 +101,7 @@ process_file() {
         pids=()
         for part in "$WORK_ROOT"/s[0-9]*.mp4; do
             # FIX: Aggiunto -nostdin e configurati i thread sicuri e pools
-                nice -n 19 ffmpeg -nostdin -y -i "$part" -c:v libx265 -crf 23 -preset veryfast \
+            nice -n 19 ffmpeg -nostdin -y -i "$part" -c:v libx265 -crf 23 -preset veryfast \
                 -threads "$FFMPEG_THREADS" -x265-params "hist-scenecut=1:pools=$THREADS_PER_CHUNK" \
                 -c:a copy "${part%.*}.enc.mp4" >/dev/null 2>&1 &
             pids+=($!)
@@ -120,8 +124,10 @@ process_file() {
 }
 
 for file in "${SELECTED_FILES[@]}"; do
-    # Monitoraggio della coda di processi in background
-    while [ $(jobs -rp | wc -l) -ge $MAX_CONCURRENT ]; do sleep 1; then :; fi; done
+    # Monitoraggio della coda di processi in background (Corretto e funzionante con set -m)
+    while [ $(jobs -rp | wc -l) -ge $MAX_CONCURRENT ]; do 
+        sleep 1
+    done
     process_file "$file" &
 done
 wait
