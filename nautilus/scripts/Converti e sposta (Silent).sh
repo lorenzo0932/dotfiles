@@ -65,7 +65,7 @@ process_silent() {
         fi
     )
 
-    if [ $? -eq 0 ] && ffmpeg -v error -i "$WORK_ROOT/merged.mp4" -f null - 2>"$failure_log"; then
+    if [ $? -eq 0 ] && ffmpeg -nostdin -v error -i "$WORK_ROOT/merged.mp4" -c copy -f null - 2>"$failure_log"; then
         if mv -f "$WORK_ROOT/merged.mp4" "$i"; then
             success=true; rm -f "$failure_log"
         fi

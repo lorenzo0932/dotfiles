@@ -65,36 +65,32 @@ for i in $NAUTILUS_SCRIPT_SELECTED_FILE_PATHS; do
         chunk_log="$current_work_dir/chunk_$j.log"
         
         # Comando: Seek veloce (-ss prima di -i) -> Legge solo quel pezzo -> Scarta output
+        # Modificato aggiungendo -nostdin per i processi in background e -xerror per isolare gli errori reali
         (
-            ffmpeg -ss "$start_time" -t "$duration_chunk" -v error -i "$original_path" -f null - >/dev/null 2>"$chunk_log"
+            ffmpeg -nostdin -ss "$start_time" -t "$duration_chunk" -v error -xerror -i "$original_path" -f null - >/dev/null 2>"$chunk_log"
         ) &
         
         pids+=($!)
     done
     
-    # 3. ATTESA FINE PROCESSI
-    # Aspettiamo che tutti i 16 pezzi siano stati letti
+    # 3. ATTESA FINE PROCESSI E CONTROLLO ERRORI REALI
+    # Analizziamo l'exit status reale di ciascuno dei 16 processi in background.
+    # Se anche uno solo fallisce (ritorna diverso da 0), consideriamo il file danneggiato.
+    file_is_bad=false
     for pid in "${pids[@]}"; do
-        wait $pid
+        if ! wait "$pid"; then
+            file_is_bad=true
+        fi
     done
     
-    # 4. AGGREGAZIONE RISULTATI
-    # Controlliamo se qualche log contiene errori
-    file_is_bad=false
-    full_error_log="$LOG_DIR/${base_name}.log"
-    
-    # Concateniamo tutti i log dei chunk per cercare errori
-    cat "$current_work_dir"/chunk_*.log > "$current_work_dir/full_log.txt"
-    
-    if [ -s "$current_work_dir/full_log.txt" ]; then
-        # Se il file log complessivo non è vuoto, c'è stato un errore
-        cp "$current_work_dir/full_log.txt" "$full_error_log"
-        file_is_bad=true
-    fi
-    
+    # 4. AGGREGAZIONE RISULTATI E SALVATAGGIO DEI LOG
     if [ "$file_is_bad" = true ]; then
         corrupt_files=$((corrupt_files + 1))
         corrupt_list="${corrupt_list}\n${base_name}"
+        
+        # Concateniamo e salviamo i log d'errore solo in caso di fallimento effettivo
+        full_error_log="$LOG_DIR/${base_name}.log"
+        cat "$current_work_dir"/chunk_*.log > "$full_error_log"
         echo "❌ DANNEGGIATO"
     else
         echo "✅ SANO"
