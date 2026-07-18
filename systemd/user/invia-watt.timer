@@ -1,0 +1,12 @@
+[Unit]
+Description=Esegui invia-watt periodicamente (User)
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=30sec
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
+
+
