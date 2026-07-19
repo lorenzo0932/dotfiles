@@ -4,7 +4,9 @@ This directory contains Bash scripts designed to manage display configurations, 
 
 ## Purpose:
 - `ReturnToDesktop.sh`: This script configures the display output to revert to a standard desktop monitor setup. It adjusts resolution, refresh rate, and primary display settings as defined within the script.
+- `ReturnToDesktop60Hz.sh`: A variant script that configures the desktop monitor specifically to a 60Hz refresh rate (2560x1080@59.978).
 - `ReturnToTV.sh`: This script configures the display output to switch to a TV setup. It adjusts resolution, refresh rate, and primary display settings suitable for a television, often used for media consumption or gaming.
+- `ReturnToTV_Delayed.sh`: A script that waits 15 seconds before switching to the TV setup. It also disables specific GNOME extensions (Vitals, AppIndicator, Tiling Assistant) and resets the text scaling factor for TV viewing comfort.
 
 ## Guidelines:
 - **Configuration**: Before using, open each script (`.sh` files) and verify that the display names (e.g., `HDMI-1`, `DP-0`) and desired resolutions match your specific hardware setup. Incorrect display names or resolutions can lead to display issues.

@@ -9,11 +9,13 @@ This directory contains scripts and configuration files for managing custom and 
     - **Media Keybindings Only**: Default multimedia and system-related shortcuts.
     - **Window Manager Keybindings Only**: Shortcuts related to window management (e.g., switching workspaces).
 
-- `custom-keybindings.conf`: Stores only the user-defined custom keybinding configurations.
-- `custom-keybindings-string.txt`: Contains a raw string representation of the custom keybindings, used for import operations.
-- `custom-and-media-keybindings.conf`: Stores both custom and default media-related keybindings when "All Keybindings" are exported.
-- `media-keybindings.conf`: Stores only the default media-related keybindings when "Media Keybindings Only" are exported.
-- `gnome-shell-keybindings.conf`: Stores default window manager keybindings (e.g., workspace switching) when "All Keybindings" or "Window Manager Keybindings Only" are exported.
+- `custom-and-media-keybindings.conf`: Pre-configured/saved file containing both custom and default media-related keybindings.
+- `all_keybindings.conf`: An identical copy/backup of the complete `custom-and-media-keybindings.conf` configuration.
+- `gnome-shell-keybindings.conf`: Pre-configured/saved file containing default window manager keybindings (e.g., workspace switching).
+- *Dynamically generated files (not committed by default)*:
+  - `custom-keybindings.conf`: Stores user-defined custom keybinding configurations when exporting option 2.
+  - `custom-keybindings-string.txt`: Contains a raw string representation of the custom keybindings when exporting option 2.
+  - `media-keybindings.conf`: Stores only default media-related keybindings when exporting option 3.
 
 ## Usage:
 To run the script, navigate to this directory in your terminal and execute:

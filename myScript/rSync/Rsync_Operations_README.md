@@ -4,11 +4,11 @@ This directory contains Bash scripts and configuration files for automating `rsy
 
 ## Project Overview
 
--   `rSync.sh`: Main script for dotfile synchronization and automated Git commits.
--   `rSync_dev.sh`: A development version of `rSync.sh`, useful for testing.
--   `rSync copy.sh`: An additional copy of the script, for backup or specific purposes.
+-   `rSync.sh`: Main script for dotfile synchronization and automated Git commits using Gemini API.
+-   `rSync_dev.sh`: A development/testing version of `rSync.sh`.
+-   `rSync(LMStudio).sh`: A variant script configured to use a local LM Studio server (OpenAI-compatible endpoint) to generate commit messages.
+-   `rSync_NoCommit.sh`: A simple synchronization script that only runs `rsync` without doing any Git operations.
 -   `exclude.txt`: Defines file/directory patterns to be excluded during `rsync` synchronization.
--   `gemini.env`: (Used for API key configuration, but excluded from documentation).
 
 ## Features
 
