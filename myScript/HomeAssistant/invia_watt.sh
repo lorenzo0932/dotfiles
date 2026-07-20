@@ -1,8 +1,8 @@
 #!/bin/bash
 # --- CONFIGURAZIONE MQTT ---
 MQTT_HOST="192.168.1.39"
-MQTT_USER="lorenzo"
-MQTT_PASS="Pozzallo0932!"
+MQTT_USER="${MQTT_USER:-lorenzo}"
+MQTT_PASS="${MQTT_PASS:?MQTT_PASS not set. Export it before running this script.}"
 # Percorso del binario ryzen_monitor compilato
 RYZEN_MONITOR="/home/lorenzo/.local/share/myScript/HomeAssistant/ryzen_monitor/src/ryzen_monitor"
 # ---------------------------
