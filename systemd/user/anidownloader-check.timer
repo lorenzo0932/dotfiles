@@ -1,0 +1,10 @@
+[Unit]
+Description=AniDownloader check periodico
+Requires=anidownloader-check.service
+
+[Timer]
+OnCalendar=*-*-* *:00,15,30,45:00
+Persistent=true
+
+[Install]
+WantedBy=default.target

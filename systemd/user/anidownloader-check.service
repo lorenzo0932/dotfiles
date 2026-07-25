@@ -1,0 +1,9 @@
+[Unit]
+Description=AniDownloader check nuovi episodi
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/lorenzo/.local/share/anidownloader-headless/anidownloaderd
+StandardOutput=journal
+StandardError=journal
