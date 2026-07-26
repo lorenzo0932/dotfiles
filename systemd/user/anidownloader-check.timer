@@ -3,7 +3,10 @@ Description=AniDownloader check periodico
 Requires=anidownloader-check.service
 
 [Timer]
-OnCalendar=*-*-* *:00,15,30,45:00
+OnBootSec=5min
+OnUnitActiveSec=15min
+OnClockChange=true
+OnTimezoneChange=true
 Persistent=true
 
 [Install]
