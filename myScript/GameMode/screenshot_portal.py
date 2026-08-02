@@ -439,7 +439,6 @@ def publish_color(frame):
     b_pct = BRIGHT_FIXED
     payload = f"{h_deg},{s_pct},{b_pct}"
     mqtt_pub("fedora/light/led/color", payload)
-    mqtt_pub("fedora/light/cam/color", payload)
     log(f"pubblicato: {payload} [{hue_label}]")
 
 
