@@ -18,7 +18,7 @@ gi.require_version("Gio", "2.0")
 gi.require_version("Gst", "1.0")
 from gi.repository import Gio, GLib, Gst
 
-INTERVAL = 8
+INTERVAL = 5
 MQTT_HOST = "192.168.1.39"
 STATE_DIR = os.path.expanduser("~/.local/state/ambilight")
 STATE_FILE = os.path.join(STATE_DIR, "screencast.json")
@@ -30,7 +30,7 @@ bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 loop = GLib.MainLoop()
 
 s = {"session": None, "node": None, "fd": None, "restore_token": None,
-     "grab_in_progress": False}
+     "grab_in_progress": False, "cur_color": None}
 
 
 def log(msg):
@@ -313,6 +313,13 @@ def publish_color():
         if lum < 90:
             lift = 90 - lum
             r, g, b = _clamp(r + lift), _clamp(g + lift), _clamp(b + lift)
+        # smoothing: scorre verso il nuovo colore invece di saltarci
+        cur = s["cur_color"]
+        if cur:
+            r = int(r * 0.5 + cur[0] * 0.5)
+            g = int(g * 0.5 + cur[1] * 0.5)
+            b = int(b * 0.5 + cur[2] * 0.5)
+        s["cur_color"] = (r, g, b)
         color = f"{r},{g},{b}"
         mqtt_pub("fedora/light/color", color)
         log(f"colore pubblicato: {color}")
