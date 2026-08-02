@@ -72,6 +72,20 @@ def conf_load():
     return os.environ.get("MQTT_USER", "lorenzo"), os.environ.get("MQTT_PASS", "")
 
 
+def gamemode_active():
+    """True se esiste almeno una sessione GameMode attiva (gamemoderun)."""
+    try:
+        out = subprocess.run(
+            ["gdbus", "call", "--session",
+             "--dest", "com.feralinteractive.GameMode",
+             "--object-path", "/com/feralinteractive/GameMode",
+             "--method", "com.feralinteractive.GameMode.QueryStatus", "0"],
+            capture_output=True, text=True, timeout=5)
+        return "(" in out.stdout and not out.stdout.startswith("(0")
+    except Exception:
+        return False
+
+
 def mqtt_pub(topic, msg):
     user, pw = conf_load()
     if not pw:
@@ -242,6 +256,9 @@ def open_pipewire():
 
 def loop_ready():
     log("loop avviato")
+    if not gamemode_active():
+        log("nessuna sessione gamemoderun attiva: esco senza toccare le luci")
+        sys.exit(0)
     mqtt_pub("fedora/light/start", "1")
     desc = (f"pipewiresrc fd={s['fd']} path={s['node']} "
             f"! videoconvert ! videoscale ! video/x-raw,width=240,format=RGB "

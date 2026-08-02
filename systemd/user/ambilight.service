@@ -5,7 +5,6 @@ After=graphical-session.target
 [Service]
 Type=simple
 EnvironmentFile=%h/.config/mqtt.env
-ExecStartPre=/bin/bash -c 'mosquitto_pub -h 192.168.1.39 -u "${MQTT_USER:-lorenzo}" -P "$MQTT_PASS" -t fedora/light/start -m 1'
 ExecStart=/usr/bin/python3 /home/lorenzo/.local/share/myScript/GameMode/screenshot_portal.py daemon
 Restart=on-failure
 RestartSec=5
