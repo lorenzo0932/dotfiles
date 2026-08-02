@@ -8,7 +8,6 @@ Alla terminazione pubblica fedora/light/end e chiude la sessione.
 Uso: screenshot_portal.py daemon
 """
 import json
-import math
 import os
 import secrets
 import signal
@@ -26,18 +25,17 @@ gi.require_version("GstApp", "1.0")
 from gi.repository import Gio, GLib, Gst, GstApp
 
 INTERVAL = 0.7        # secondi tra un'analisi colore e l'altra
-# Transizioni smooth via rate limit (gradi/percentuali al secondo):
-# il colore si muove verso il target alla velocita' massima costante,
-# niente cambi repentini a meno di un cambio drastico di scena (>HUE_FAST_MAX).
-HUE_RATE_DEG = 18.0    # max velocita' di spostamento hue (gradi/s)
-SAT_RATE_PCT = 20.0    # max velocita' per saturazione e luminosita' (pct/s)
-HUE_FAST_MAX = 120     # > 120° di delta hue (circolare): bypass immediato
-HUE_HYSTERESIS = 12    # niente oscillazioni entro 12°
-# Soglie minime di variazione (post-smoothing) per pubblicare: scene statiche
-# non generano traffico verso MQTT/HA e non riavviano l'automazione colore.
-PUB_HUE_DEG = 1.0
-PUB_SAT_DELTA = 0.02
-PUB_VAL_DELTA = 0.02
+# Transizioni "cinematiche" a pochi step: il daemon pubblica il target solo
+# quando la scena si e' allontanata abbastanza dall'ultimo colore inviato;
+# sono i device a fare le transizioni fluide (fade nativo della luce camera,
+# fade hardware della strip LED regolato da dp26=100, ~35 gradi/s).
+# Meno publish = niente perdite ne' interruzioni di fade: ogni cambio e' un
+# passaggio lungo e continuo, anche tra colori opposti.
+PUB_HUE_DEG = 20.0    # soglia minima di spostamento hue per pubblicare
+PUB_SAT_DELTA = 0.15  # soglia minima per saturazione e luminosita'
+PUB_VAL_DELTA = 0.15
+BRIGHT_MIN = 35         # luminosita' pct minima (scena scura)
+BRIGHT_MAX = 80         # luminosita' pct massima (scena chiara)
 BRIGHT_MIN = 35         # luminosita' pct minima (scena scura)
 BRIGHT_MAX = 80         # luminosita' pct massima (scena chiara)
 MQTT_HOST = "192.168.1.39"
@@ -387,32 +385,9 @@ def publish_color(frame):
         return
     th, ts, tv, hue_label = res
     ts = max(ts, 0.45)
-    # Smoothing a rate limit in HSV (hue circolare): il colore segue il
-    # target alla velocita' massima costante HUE_RATE_DEG (gradi/s) e
-    # SAT_RATE_PCT (%/s), con hysteresis per le oscillazioni e bypass
-    # immediato solo per cambi di scena drastici (>HUE_FAST_MAX).
-    cur = s["cur_hsv"]
-    if cur:
-        dv = (th - cur[0] + 0.5) % 1.0 - 0.5
-        d_h = abs(dv) * 360
-        if d_h < HUE_HYSTERESIS:
-            dv = 0.0
-        elif d_h <= HUE_FAST_MAX:
-            max_step = HUE_RATE_DEG * INTERVAL / 360.0
-            if d_h > max_step * 360:
-                dv = math.copysign(max_step, dv)
-        th = (cur[0] + dv) % 1.0
-        max_step = SAT_RATE_PCT / 100.0 * INTERVAL
-        ds = ts - cur[1]
-        if abs(ds) > max_step:
-            ts = cur[1] + math.copysign(max_step, ds)
-        dsv = tv - cur[2]
-        if abs(dsv) > max_step:
-            tv = cur[2] + math.copysign(max_step, dsv)
-    s["cur_hsv"] = (th, ts, tv)
-    # Publish solo su variazione significativa rispetto all'ultimo inviato:
-    # scene statiche non generano trigger MQTT (l'automazione colore non
-    # viene riavviata di continuo).
+    # Publish solo quando la scena si e' allontanata oltre la soglia:
+    # pochi target ben distanziati, le transizioni fluide le fanno i device
+    # (fade hardware). Scene statiche non generano trigger MQTT.
     lp = s["last_pub"]
     if lp is not None:
         dh = abs((th * 360 - lp[0] * 360 + 180) % 360 - 180)
@@ -426,8 +401,9 @@ def publish_color(frame):
     b_pct = int(BRIGHT_MIN + tv * (BRIGHT_MAX - BRIGHT_MIN))
     b_pct = max(BRIGHT_MIN, min(BRIGHT_MAX, b_pct))
     payload = f"{h_deg},{s_pct},{b_pct}"
-    mqtt_pub("fedora/light/color", payload)
-    log(f"colore pubblicato: {payload} [{hue_label}]")
+    mqtt_pub("fedora/light/led/color", payload)
+    mqtt_pub("fedora/light/cam/color", payload)
+    log(f"pubblicato: {payload} [{hue_label}]")
 
 
 # ---------- fine ----------
