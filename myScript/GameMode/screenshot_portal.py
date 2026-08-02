@@ -20,6 +20,7 @@ gi.require_version("Gst", "1.0")
 from gi.repository import Gio, GLib, Gst
 
 INTERVAL = 5
+ALPHA = 0.35
 MQTT_HOST = "192.168.1.39"
 STATE_DIR = os.path.expanduser("~/.local/state/ambilight")
 STATE_FILE = os.path.join(STATE_DIR, "screencast.json")
@@ -31,7 +32,7 @@ bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 loop = GLib.MainLoop()
 
 s = {"session": None, "node": None, "fd": None, "restore_token": None,
-     "grab_in_progress": False, "cur_color": None}
+     "grab_in_progress": False, "cur_hsv": None}
 
 
 def log(msg):
@@ -304,7 +305,7 @@ def publish_color():
         hue_label = "fallback"
         if total_e < 0.012 * n:
             # scena quasi senza colore: niente grigio "strano", ambra soffusa
-            r, g, b = 200, 150, 60
+            th, ts, tv = colorsys.rgb_to_hsv(200 / 255, 150 / 255, 60 / 255)
         else:
             nbins = 18
             bsum = [0.0] * nbins
@@ -319,22 +320,23 @@ def publish_color():
             r = sum(px[k][0] for k in grp) // cnt
             g = sum(px[k][1] for k in grp) // cnt
             b = sum(px[k][2] for k in grp) // cnt
-            hh, ss, vv = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
-            vv = max(vv, 0.5)
-            ss = max(ss, 0.45)
-            r, g, b = (round(c * 255) for c in colorsys.hsv_to_rgb(hh, ss, vv))
-            hue_label = f"h{int(hh * 360)}"
-        # smoothing: scorre verso il nuovo colore invece di saltarci
-        cur = s["cur_color"]
+            th, ts, tv = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            hue_label = f"h{int(th * 360)}"
+        ts = max(ts, 0.45)
+        tv = max(tv, 0.5)
+        # smoothing in HSV (hue circolare): transizioni sempre sulla stessa
+        # tinta, senza passare dal grigio (che la striscia HS rende male)
+        cur = s["cur_hsv"]
         if cur:
-            r = int(r * 0.48 + cur[0] * 0.52)
-            g = int(g * 0.48 + cur[1] * 0.52)
-            b = int(b * 0.48 + cur[2] * 0.52)
-        s["cur_color"] = (r, g, b)
+            d = (th - cur[0] + 0.5) % 1.0 - 0.5
+            th = (cur[0] + d * ALPHA) % 1.0
+            ts = cur[1] * (1 - ALPHA) + ts * ALPHA
+            tv = cur[2] * (1 - ALPHA) + tv * ALPHA
+        s["cur_hsv"] = (th, ts, tv)
+        r, g, b = (round(c * 255) for c in colorsys.hsv_to_rgb(th, ts, tv))
         color = f"{r},{g},{b}"
         mqtt_pub("fedora/light/color", color)
-        _, ssat, _v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
-        log(f"colore pubblicato: {color} [{hue_label} s={ssat:.2f}]")
+        log(f"colore pubblicato: {color} [{hue_label} s={ts:.2f}]")
     except Exception as e:
         import traceback
         log(f"colore err: {e}\n{traceback.format_exc()}")
