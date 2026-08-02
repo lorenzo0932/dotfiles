@@ -26,21 +26,18 @@ from gi.repository import Gio, GLib, Gst, GstApp
 
 INTERVAL = 0.7        # secondi tra un'analisi colore e l'altra
 # Transizioni "cinematiche" a pochi step: il daemon pubblica il target solo
-# quando la scena si e' allontanata abbastanza dall'ultimo colore inviato;
-# sono i device a fare le transizioni fluide (fade nativo della luce camera,
-# fade hardware della strip LED regolato da dp26=150, ~35 gradi/s).
-# Meno publish = niente perdite ne' interruzioni di fade: ogni cambio e' un
-# passaggio lungo e continuo, anche tra colori opposti.
-PUB_HUE_DEG = 20.0    # soglia minima di spostamento hue per pubblicare
-PUB_SAT_DELTA = 0.15  # soglia minima per saturazione e luminosita'
-PUB_VAL_DELTA = 0.15
+# quando la scena si e' allontanata abbastanza dall'ultimo colore inviato e
+# solo ogni COOLDOWN secondi; sono i device a fare le transizioni fluide
+# (fade nativo della luce camera, fade hardware della strip LED regolato da
+# dp26=150, ~35 gradi/s). Cooldown >= durata fade: ogni cambio e' un passaggio
+# lungo e continuo che arriva a destinazione, senza interruzioni a meta'.
+PUB_HUE_DEG = 30.0    # soglia minima di spostamento hue per pubblicare
+PUB_SAT_DELTA = 0.2   # soglia minima di variazione saturazione
+COOLDOWN = 6.0        # intervallo minimo (s) tra due publish
+BRIGHT_FIXED = 80     # luminosita' pct fissa: il colore segue la scena, la bri no
 # Stabilita' del colore: la tinta e' la media gaussiana pesata dei bin hue
 # attorno al bin con piu' energia (sigma ~40°), quindi aree piccole ma sature
-# (es. mani in movimento) non fanno cambiare colore alle luci. TARGET_SMOOTH
-# aggiunge un low-pass temporale sulle fluttuazioni piu' veloci di ~1.5s.
-TARGET_SMOOTH = 0.5
-BRIGHT_MIN = 35         # luminosita' pct minima (scena scura)
-BRIGHT_MAX = 80         # luminosita' pct massima (scena chiara)
+# (es. mani in movimento) non fanno cambiare colore alle luci.
 MQTT_HOST = "192.168.1.39"
 STATE_DIR = os.path.expanduser("~/.local/state/ambilight")
 STATE_FILE = os.path.join(STATE_DIR, "screencast.json")
@@ -51,7 +48,7 @@ bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 loop = GLib.MainLoop()
 
 s = {"session": None, "node": None, "fd": None, "restore_token": None,
-     "cur_hsv": None, "last_pub": None, "target_hsv": None,
+     "cur_hsv": None, "last_pub": None, "last_pub_time": 0.0,
      "pipeline": None, "last_frame": None, "frame_seq": 0, "running": True}
 lock = threading.Lock()
 
@@ -402,30 +399,24 @@ def publish_color(frame):
         return
     th, ts, tv, hue_label = res
     ts = max(ts, 0.45)
-    # Low-pass temporale: il target pubblicato converge lentamente verso il
-    # colore calcolato, smorzando le fluttuazioni rapide della scena.
-    prev = s["target_hsv"]
-    if prev is not None:
-        dv = (th - prev[0] + 0.5) % 1.0 - 0.5
-        th = (prev[0] + dv * TARGET_SMOOTH) % 1.0
-        ts = prev[1] + (ts - prev[1]) * TARGET_SMOOTH
-        tv = prev[2] + (tv - prev[2]) * TARGET_SMOOTH
-    s["target_hsv"] = (th, ts, tv)
-    # Publish solo quando la scena si e' allontanata oltre la soglia:
-    # pochi target ben distanziati, le transizioni fluide le fanno i device
-    # (fade hardware). Scene statiche non generano trigger MQTT.
+    # Cooldown: tra un publish e il successivo passa almeno COOLDOWN secondi,
+    # cosi' il fade hardware arriva a destinazione prima del prossimo cambio.
+    now = time.time()
+    if now - s["last_pub_time"] < COOLDOWN:
+        log(f"cooldown: prossimo publish tra {COOLDOWN - (now - s['last_pub_time']):.1f}s")
+        return
+    # Publish solo quando la scena si e' allontanata oltre la soglia.
     lp = s["last_pub"]
     if lp is not None:
         dh = abs((th * 360 - lp[0] * 360 + 180) % 360 - 180)
-        if dh < PUB_HUE_DEG and abs(ts - lp[1]) < PUB_SAT_DELTA \
-                and abs(tv - lp[2]) < PUB_VAL_DELTA:
+        if dh < PUB_HUE_DEG and abs(ts - lp[1]) < PUB_SAT_DELTA:
             log(f"colore invariato ({hue_label}): nessun publish")
             return
     s["last_pub"] = (th, ts, tv)
+    s["last_pub_time"] = now
     h_deg = round(th * 360, 1)
     s_pct = round(ts * 100, 1)
-    b_pct = int(BRIGHT_MIN + tv * (BRIGHT_MAX - BRIGHT_MIN))
-    b_pct = max(BRIGHT_MIN, min(BRIGHT_MAX, b_pct))
+    b_pct = BRIGHT_FIXED
     payload = f"{h_deg},{s_pct},{b_pct}"
     mqtt_pub("fedora/light/led/color", payload)
     mqtt_pub("fedora/light/cam/color", payload)
