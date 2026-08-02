@@ -242,6 +242,7 @@ def open_pipewire():
 
 def loop_ready():
     log("loop avviato")
+    mqtt_pub("fedora/light/start", "1")
     desc = (f"pipewiresrc fd={s['fd']} path={s['node']} "
             f"! videoconvert ! videoscale ! video/x-raw,width=240,format=RGB "
             f"! appsink name=sink emit-signals=True max-buffers=1 drop=True")
