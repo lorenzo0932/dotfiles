@@ -28,14 +28,17 @@ INTERVAL = 0.7        # secondi tra un'analisi colore e l'altra
 # Transizioni "cinematiche" a pochi step: il daemon pubblica il target solo
 # quando la scena si e' allontanata abbastanza dall'ultimo colore inviato;
 # sono i device a fare le transizioni fluide (fade nativo della luce camera,
-# fade hardware della strip LED regolato da dp26=100, ~35 gradi/s).
+# fade hardware della strip LED regolato da dp26=150, ~35 gradi/s).
 # Meno publish = niente perdite ne' interruzioni di fade: ogni cambio e' un
 # passaggio lungo e continuo, anche tra colori opposti.
 PUB_HUE_DEG = 20.0    # soglia minima di spostamento hue per pubblicare
 PUB_SAT_DELTA = 0.15  # soglia minima per saturazione e luminosita'
 PUB_VAL_DELTA = 0.15
-BRIGHT_MIN = 35         # luminosita' pct minima (scena scura)
-BRIGHT_MAX = 80         # luminosita' pct massima (scena chiara)
+# Stabilita' del colore: la tinta e' la media gaussiana pesata dei bin hue
+# attorno al bin con piu' energia (sigma ~40°), quindi aree piccole ma sature
+# (es. mani in movimento) non fanno cambiare colore alle luci. TARGET_SMOOTH
+# aggiunge un low-pass temporale sulle fluttuazioni piu' veloci di ~1.5s.
+TARGET_SMOOTH = 0.5
 BRIGHT_MIN = 35         # luminosita' pct minima (scena scura)
 BRIGHT_MAX = 80         # luminosita' pct massima (scena chiara)
 MQTT_HOST = "192.168.1.39"
@@ -48,8 +51,8 @@ bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 loop = GLib.MainLoop()
 
 s = {"session": None, "node": None, "fd": None, "restore_token": None,
-     "cur_hsv": None, "last_pub": None, "pipeline": None, "last_frame": None,
-     "frame_seq": 0, "running": True}
+     "cur_hsv": None, "last_pub": None, "target_hsv": None,
+     "pipeline": None, "last_frame": None, "frame_seq": 0, "running": True}
 lock = threading.Lock()
 
 
@@ -330,8 +333,14 @@ def analyze():
 
 
 def dominant_hsv(rgb):
-    """Colore 'energia' dominante: tinta con piu' energia cumulativa
-    (sat x lum x copertura). Ritorna (h, s, v) in [0,1)."""
+    """Colore dominante: hue calcolato come media gaussiana pesata dei bin
+    attorno al bin con piu' energia (sigma = 2 bin, ~40°).
+
+    I bin lontani dal vincente contribuiscono quasi zero: le aree piccole ma
+    sature (mani, oggetti in movimento) non spostano il colore delle luci e
+    non ci sono fluttuazioni tra colori quasi opposti. Sat/lum dalla media
+    dei pixel del bin vincente (colore vivo). Ritorna (h, s, v) in [0,1),
+    None se la scena e' quasi senza colore."""
     f = rgb.astype(np.float64) / 255.0
     r, g, b = f[..., 0], f[..., 1], f[..., 2]
     mx = np.maximum(np.maximum(r, g), b)
@@ -362,12 +371,20 @@ def dominant_hsv(rgb):
     bi = (hue * nbins).astype(np.int64).ravel() % nbins
     bsum = np.bincount(bi, weights=energy.ravel(), minlength=nbins)
     best = int(np.argmax(bsum))
+    # peso gaussiano circolare attorno al bin vincente
+    dist = np.abs((np.arange(nbins) - best + nbins // 2) % nbins - nbins // 2)
+    w = np.exp(-(dist ** 2) / (2 * 2.0 ** 2))
+    theta = (np.arange(nbins) + 0.5) / nbins * 2.0 * np.pi
+    sin_s = float(np.sum(bsum * w * np.sin(theta)))
+    cos_s = float(np.sum(bsum * w * np.cos(theta)))
+    th = (np.arctan2(sin_s, cos_s) % (2.0 * np.pi)) / (2.0 * np.pi)
+    # sat/lum dalla media dei pixel del bin vincente
     mbin = (hue * nbins).astype(np.int64).ravel() % nbins == best
     mbin = mbin.reshape(r.shape)
     r_m = float(r[mbin].mean())
     g_m = float(g[mbin].mean())
     b_m = float(b[mbin].mean())
-    th, ts, tv = colorsys_hsv(r_m, g_m, b_m)
+    _, ts, tv = colorsys_hsv(r_m, g_m, b_m)
     return th, ts, tv, f"h{int(th * 360)}"
 
 
@@ -385,6 +402,15 @@ def publish_color(frame):
         return
     th, ts, tv, hue_label = res
     ts = max(ts, 0.45)
+    # Low-pass temporale: il target pubblicato converge lentamente verso il
+    # colore calcolato, smorzando le fluttuazioni rapide della scena.
+    prev = s["target_hsv"]
+    if prev is not None:
+        dv = (th - prev[0] + 0.5) % 1.0 - 0.5
+        th = (prev[0] + dv * TARGET_SMOOTH) % 1.0
+        ts = prev[1] + (ts - prev[1]) * TARGET_SMOOTH
+        tv = prev[2] + (tv - prev[2]) * TARGET_SMOOTH
+    s["target_hsv"] = (th, ts, tv)
     # Publish solo quando la scena si e' allontanata oltre la soglia:
     # pochi target ben distanziati, le transizioni fluide le fanno i device
     # (fade hardware). Scene statiche non generano trigger MQTT.
