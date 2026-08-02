@@ -8,6 +8,7 @@ Alla terminazione pubblica fedora/light/end e chiude la sessione.
 Uso: screenshot_portal.py daemon
 """
 import json
+import math
 import os
 import secrets
 import signal
@@ -24,14 +25,19 @@ gi.require_version("Gst", "1.0")
 gi.require_version("GstApp", "1.0")
 from gi.repository import Gio, GLib, Gst, GstApp
 
-INTERVAL = 1.0        # secondi tra un'analisi colore e l'altra
-ALPHA = 0.35
-# Smoothing adattivo per intervalli di delta hue (circolare):
-# drift -> fast -> bypass, come i filtri SOTA sui cut.
-HUE_SMOOTH_MAX = 50     # <= 50° : drift lento
-HUE_FAST_MAX = 120      # 50-120°: fast chase (1-2 grab)
-HUE_SNAP_DEG = 120      # > 120° : bypass (target immediato)
-HUE_HYSTERESIS = 12     # niente oscillazioni entro 12°
+INTERVAL = 0.7        # secondi tra un'analisi colore e l'altra
+# Transizioni smooth via rate limit (gradi/percentuali al secondo):
+# il colore si muove verso il target alla velocita' massima costante,
+# niente cambi repentini a meno di un cambio drastico di scena (>HUE_FAST_MAX).
+HUE_RATE_DEG = 18.0    # max velocita' di spostamento hue (gradi/s)
+SAT_RATE_PCT = 20.0    # max velocita' per saturazione e luminosita' (pct/s)
+HUE_FAST_MAX = 120     # > 120° di delta hue (circolare): bypass immediato
+HUE_HYSTERESIS = 12    # niente oscillazioni entro 12°
+# Soglie minime di variazione (post-smoothing) per pubblicare: scene statiche
+# non generano traffico verso MQTT/HA e non riavviano l'automazione colore.
+PUB_HUE_DEG = 1.0
+PUB_SAT_DELTA = 0.02
+PUB_VAL_DELTA = 0.02
 BRIGHT_MIN = 35         # luminosita' pct minima (scena scura)
 BRIGHT_MAX = 80         # luminosita' pct massima (scena chiara)
 MQTT_HOST = "192.168.1.39"
@@ -44,7 +50,7 @@ bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 loop = GLib.MainLoop()
 
 s = {"session": None, "node": None, "fd": None, "restore_token": None,
-     "cur_hsv": None, "pipeline": None, "last_frame": None,
+     "cur_hsv": None, "last_pub": None, "pipeline": None, "last_frame": None,
      "frame_seq": 0, "running": True}
 lock = threading.Lock()
 
@@ -381,32 +387,47 @@ def publish_color(frame):
         return
     th, ts, tv, hue_label = res
     ts = max(ts, 0.45)
-    # smoothing adattivo in HSV (hue circolare): drift per cambi piccoli,
-    # bypass per i cambi di scena (niente attraversamento di colori intermedi).
-    a = ALPHA
+    # Smoothing a rate limit in HSV (hue circolare): il colore segue il
+    # target alla velocita' massima costante HUE_RATE_DEG (gradi/s) e
+    # SAT_RATE_PCT (%/s), con hysteresis per le oscillazioni e bypass
+    # immediato solo per cambi di scena drastici (>HUE_FAST_MAX).
     cur = s["cur_hsv"]
     if cur:
         dv = (th - cur[0] + 0.5) % 1.0 - 0.5
         d_h = abs(dv) * 360
         if d_h < HUE_HYSTERESIS:
             dv = 0.0
-        if d_h <= HUE_SMOOTH_MAX:
-            a = ALPHA
         elif d_h <= HUE_FAST_MAX:
-            a = 0.9
-        else:
-            a = 1.0
-        th = (cur[0] + dv * a) % 1.0
-        ts = cur[1] * (1 - ALPHA) + ts * ALPHA
-        tv = cur[2] * (1 - ALPHA) + tv * ALPHA
+            max_step = HUE_RATE_DEG * INTERVAL / 360.0
+            if d_h > max_step * 360:
+                dv = math.copysign(max_step, dv)
+        th = (cur[0] + dv) % 1.0
+        max_step = SAT_RATE_PCT / 100.0 * INTERVAL
+        ds = ts - cur[1]
+        if abs(ds) > max_step:
+            ts = cur[1] + math.copysign(max_step, ds)
+        dsv = tv - cur[2]
+        if abs(dsv) > max_step:
+            tv = cur[2] + math.copysign(max_step, dsv)
     s["cur_hsv"] = (th, ts, tv)
+    # Publish solo su variazione significativa rispetto all'ultimo inviato:
+    # scene statiche non generano trigger MQTT (l'automazione colore non
+    # viene riavviata di continuo).
+    lp = s["last_pub"]
+    if lp is not None:
+        dh = abs((th * 360 - lp[0] * 360 + 180) % 360 - 180)
+        if dh < PUB_HUE_DEG and abs(ts - lp[1]) < PUB_SAT_DELTA \
+                and abs(tv - lp[2]) < PUB_VAL_DELTA:
+            log(f"colore invariato ({hue_label}): nessun publish")
+            return
+    s["last_pub"] = (th, ts, tv)
     h_deg = round(th * 360, 1)
     s_pct = round(ts * 100, 1)
     b_pct = int(BRIGHT_MIN + tv * (BRIGHT_MAX - BRIGHT_MIN))
     b_pct = max(BRIGHT_MIN, min(BRIGHT_MAX, b_pct))
     payload = f"{h_deg},{s_pct},{b_pct}"
     mqtt_pub("fedora/light/color", payload)
-    log(f"colore pubblicato: {payload} [{hue_label} a={a:.2f}]")
+    log(f"colore pubblicato: {payload} [{hue_label}]")
 
 
 # ---------- fine ----------
