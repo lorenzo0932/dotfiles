@@ -21,6 +21,12 @@ from gi.repository import Gio, GLib, Gst
 
 INTERVAL = 5
 ALPHA = 0.35
+# Smoothing adattivo per intervalli di delta hue (circolare):
+# drift -> fast -> bypass, come i filtri SOTA sui cut.
+HUE_SMOOTH_MAX = 50     # <= 50° : drift lento
+HUE_FAST_MAX = 120      # 50-120°: fast chase (1-2 grab)
+HUE_SNAP_DEG = 120      # > 120° : bypass (target immediato)
+HUE_HYSTERESIS = 12     # niente oscillazioni entro 12°
 MQTT_HOST = "192.168.1.39"
 STATE_DIR = os.path.expanduser("~/.local/state/ambilight")
 STATE_FILE = os.path.join(STATE_DIR, "screencast.json")
@@ -324,19 +330,30 @@ def publish_color():
             hue_label = f"h{int(th * 360)}"
         ts = max(ts, 0.45)
         tv = max(tv, 0.5)
-        # smoothing in HSV (hue circolare): transizioni sempre sulla stessa
-        # tinta, senza passare dal grigio (che la striscia HS rende male)
+        # smoothing adattivo in HSV (hue circolare). Il fattore alpha dipende
+        # dalla distanza circolare: drift per cambi piccoli, bypass per i
+        # cambi di scena (niente attraversamento di colori intermedi).
+        a = ALPHA
         cur = s["cur_hsv"]
         if cur:
-            d = (th - cur[0] + 0.5) % 1.0 - 0.5
-            th = (cur[0] + d * ALPHA) % 1.0
+            dv = (th - cur[0] + 0.5) % 1.0 - 0.5
+            d_h = abs(dv) * 360
+            if d_h < HUE_HYSTERESIS:
+                dv = 0.0
+            if d_h <= HUE_SMOOTH_MAX:
+                a = ALPHA
+            elif d_h <= HUE_FAST_MAX:
+                a = 0.9
+            else:
+                a = 1.0
+            th = (cur[0] + dv * a) % 1.0
             ts = cur[1] * (1 - ALPHA) + ts * ALPHA
             tv = cur[2] * (1 - ALPHA) + tv * ALPHA
         s["cur_hsv"] = (th, ts, tv)
         r, g, b = (round(c * 255) for c in colorsys.hsv_to_rgb(th, ts, tv))
         color = f"{r},{g},{b}"
         mqtt_pub("fedora/light/color", color)
-        log(f"colore pubblicato: {color} [{hue_label} s={ts:.2f}]")
+        log(f"colore pubblicato: {color} [{hue_label} s={ts:.2f} a={a:.2f}]")
     except Exception as e:
         import traceback
         log(f"colore err: {e}\n{traceback.format_exc()}")
