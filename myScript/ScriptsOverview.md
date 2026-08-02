@@ -36,10 +36,11 @@ Fast sink switching via PulseAudio (`pactl`).
 Handles display profile shifts between standard PC Monitor and TV.
 *   [ReturnToDesktop.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/Script%20cambio%20schermo/ReturnToDesktop.sh) / [ReturnToDesktop60Hz.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/Script%20cambio%20schermo/ReturnToDesktop60Hz.sh): Restores the monitor layout.
 *   [ReturnToTV.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/Script%20cambio%20schermo/ReturnToTV.sh) / [ReturnToTV_Delayed.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/Script%20cambio%20schermo/ReturnToTV_Delayed.sh): Connects/scales output for TV.
+*   [PreCambioRisolzione.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/Script%20cambio%20schermo/PreCambioRisolzione.sh) / [PostCambioRisoluzione.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/Script%20cambio%20schermo/PostCambioRisoluzione.sh): System-wide display transition hooks (pre/post resolution change).
 *   See [DisplaySwitching_README.md](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/Script%20cambio%20schermo/DisplaySwitching_README.md) for more details.
 
 ### 8. [mpv](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/mpv/)
-Advanced configuration for the MPV media player.
+Advanced configuration for the MPV media player. This directory is synced from the real config in use (`~/.config/mpv`) by `rSync.sh` (excluding the transient `watch_later/`).
 *   Custom keybindings (`input.conf`), performance tweaks (`mpv.conf`), shaders (Anime4K, FSRCNNX), and lua scripts (such as `uosc` overlay and `thumbfast`).
 *   See [MPV_Configuration_README.md](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/mpv/MPV_Configuration_README.md) for detailed descriptions.
 
@@ -51,24 +52,21 @@ A suite of backup synchronization scripts integrated with LLMs to automatically 
 ### 10. [search&Convert](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/search&Convert/)
 Automates searching for video files and converting them via FFmpeg.
 *   [search&Convert.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/search&Convert/search&Convert.sh) and [Converti e verifica.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/search&Convert/Converti%20e%20verifica.sh).
+*   [crea_test_video.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/search&Convert/crea_test_video.sh) / [Create_corrupted_video.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/search&Convert/Create_corrupted_video.sh): Generates test/corrupted dummy video streams for utility validation.
 *   See [VideoProcessing_README.md](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/search&Convert/VideoProcessing_README.md) for implementation details.
 
-### 11. [Yuzu](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/Yuzu/)
-Hooks executed automatically before and after screen resolution changes for the Yuzu Emulator.
-*   See [YuzuHooks_README.md](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/Yuzu/YuzuHooks_README.md) for instructions.
+### 11. [AI Server](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/AI%20Server/)
+Controls and starts local machine learning / generative AI services.
+*   [OllamaServer.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/AI%20Server/OllamaServer.sh): Restarts the Ollama (and watchtower) Docker containers.
+*   [StableDiffusionWebUI.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/AI%20Server/StableDiffusionWebUI.sh): Starts the local Stable Diffusion web UI.
+*   [SwarmUI.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/AI%20Server/SwarmUI.sh): Starts the SwarmUI image generation frontend.
+
+### 12. [ExportGnomeExtensions](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/ExportGnomeExtensions/)
+Backs up the enabled GNOME Shell extensions as a lightweight list (no extension files are copied).
+*   [ExportGnomeExtensions.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/ExportGnomeExtensions/ExportGnomeExtensions.sh): Non-interactive; writes the enabled UUID list (`enabled-extensions.list`) and the per-extension dconf settings (`extensions-settings.conf`). Run automatically by `rsync_sync.service` (`ExecStartPre`) before every sync.
+*   [RestoreGnomeExtensions.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/ExportGnomeExtensions/RestoreGnomeExtensions.sh): Manual; downloads each extension from extensions.gnome.org, installs it in `~/.local/share/gnome-shell/extensions/`, enables it, and restores the dconf settings. Skips extensions missing/incompatible on EGO (reports them at the end).
 
 ---
-
-## Root Level Utility Scripts
-
-*   `AvviaHomeAssistant.sh`: Launches Home Assistant.
-*   `HandleHomeAssistantFailure.sh`: Recovery procedures for when the HA instance is unresponsive.
-*   `crea_test_video.sh` / `Create_corrupted_video.sh`: Generates test/corrupted dummy video streams for utility validation.
-*   `OllamaServer.sh` / `StableDiffusionWebUI.sh` / `SwarmUI.sh`: Controls and starts local machine learning / generative AI services.
-*   `PopupDownloadFiniti.sh`: Desktop pop-up alert for download triggers.
-*   `PreCambioRisolzione.sh` / `PostCambioRisoluzione.sh`: System-wide display transition hooks.
-*   `removeDKMS.sh`: Clears old and dangling DKMS drivers from Linux kernels.
-*   `toggle_pano.sh`: Toggles panoramic visual setups.
 
 ## Guidelines:
 - Each script should ideally be self-contained or clearly document its dependencies.

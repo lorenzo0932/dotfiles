@@ -9,13 +9,19 @@ This directory contains scripts and configuration files for managing custom and 
     - **Media Keybindings Only**: Default multimedia and system-related shortcuts.
     - **Window Manager Keybindings Only**: Shortcuts related to window management (e.g., switching workspaces).
 
-- `custom-and-media-keybindings.conf`: Pre-configured/saved file containing both custom and default media-related keybindings.
-- `all_keybindings.conf`: An identical copy/backup of the complete `custom-and-media-keybindings.conf` configuration.
-- `gnome-shell-keybindings.conf`: Pre-configured/saved file containing default window manager keybindings (e.g., workspace switching).
-- *Dynamically generated files (not committed by default)*:
+- `custom-and-media-keybindings.conf`: Exported snapshot of `/org/gnome/settings-daemon/plugins/media-keys/` (custom + media keybindings). Refreshed with `dconf dump` (see note below).
+- `gnome-shell-keybindings.conf`: Exported snapshot of `/org/gnome/desktop/wm/keybindings/` (window manager keybindings). Refreshed with `dconf dump` (see note below).
+- *Dynamically generated files (not committed by default, created when running the export options 2/3)*:
   - `custom-keybindings.conf`: Stores user-defined custom keybinding configurations when exporting option 2.
   - `custom-keybindings-string.txt`: Contains a raw string representation of the custom keybindings when exporting option 2.
   - `media-keybindings.conf`: Stores only default media-related keybindings when exporting option 3.
+
+## Note on the committed snapshots:
+The two committed `.conf` files are refreshed from the live system from time to time (manually or during a restore). To regenerate them from the current dconf:
+```bash
+dconf dump /org/gnome/settings-daemon/plugins/media-keys/ > custom-and-media-keybindings.conf
+dconf dump /org/gnome/desktop/wm/keybindings/ > gnome-shell-keybindings.conf
+```
 
 ## Usage:
 To run the script, navigate to this directory in your terminal and execute:

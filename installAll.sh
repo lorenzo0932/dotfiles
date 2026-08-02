@@ -1,8 +1,14 @@
 #! /bin/bash
+# Installa tutti i componenti dal repository (funziona anche da clone fresco)
 
-cd installationScripts
-chmod +x *
+set -e
+
+cd "$(dirname "$0")/installationScripts"
+chmod +x *.sh
+
+./installScripts.sh
 ./installServices.sh
-cd $HOME/.local/share/myScript
 ./installMPV.sh
 ./installNautilusScripts.sh
+
+echo "Installazione completata."

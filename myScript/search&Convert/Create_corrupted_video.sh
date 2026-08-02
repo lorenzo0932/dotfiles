@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Crea un video di prova
 ffmpeg -f lavfi -i testsrc=duration=15:size=640x360:rate=30 -c:v libx264 test.mp4
 

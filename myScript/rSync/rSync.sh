@@ -5,6 +5,7 @@
 MYSCRIPTS="/home/lorenzo/.local/share/myScript"
 NAUTILUS_SCRIPTS="/home/lorenzo/.local/share/nautilus"
 SYSTEMD_SERVICES="/home/lorenzo/.config/systemd"
+MPV_CONFIG="$HOME/.config/mpv"
 
 # Define your destination directory (your dotfiles repo folder)
 DEST="/home/lorenzo/Documenti/GitHub/dotfiles"
@@ -35,9 +36,11 @@ API_TYPE="google_ai"
 
 # --- Sync Files with rsync ---
 echo "Sincronizzazione dei file dotfiles..."
-rsync -au --delete --exclude-from='exclude.txt' "$MYSCRIPTS/" "$DEST/myScript/"
+rsync -au --delete --exclude-from='exclude.txt' --exclude='mpv/' "$MYSCRIPTS/" "$DEST/myScript/"
 rsync -au --delete --exclude-from='exclude.txt' "$NAUTILUS_SCRIPTS/" "$DEST/nautilus/"
 rsync -au --delete --exclude-from='exclude.txt' "$SYSTEMD_SERVICES/" "$DEST/systemd/"
+# Config MPV reale: ~/.config/mpv e' la fonte di verita' (watch_later e bak/cache sono transienti e vanno esclusi)
+rsync -a --delete --exclude='watch_later/' --exclude='bak/cache/' "$MPV_CONFIG/" "$DEST/myScript/mpv/"
 echo "Sincronizzazione completata."
 
 # --- Git Operations ---

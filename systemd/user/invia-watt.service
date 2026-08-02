@@ -3,6 +3,7 @@ Description=Invio statistiche CPU/GPU a Home Assistant (User)
 
 [Service]
 Type=oneshot
+EnvironmentFile=%h/.config/mqtt.env
 ExecStart=/bin/bash /home/lorenzo/.local/share/myScript/HomeAssistant/invia_watt.sh
 
 

@@ -18,4 +18,5 @@ done
 # Crea la directory di configurazione di mpv se non esiste
 mkdir -p "$MPV_CONFIG_DIR"
 
-cp -r ../myScript/mpv*  "$MPV_CONFIG_DIR"
+# Copia il CONTENUTO di myScript/mpv (la config sincronizzata con quella reale in uso)
+cp -r ../myScript/mpv/. "$MPV_CONFIG_DIR"

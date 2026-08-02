@@ -1,13 +1,21 @@
 #! /bin/bash
+# Installa le unit systemd user nel path corretto e abilita quelle in uso.
 
-#Per installare i servizi è richiesto che vengano installati gli script:
-./installScripts
+set -e
 
-#Copio i servizi nella location corretta 
-USER_SERVICES_LOCATION=$HOME/.config/share/systemd
-cp  ../systemd/* "$USER_SERVICES_LOCATION"
+# Gli script devono essere installati prima (i servizi li referenziano)
+./installScripts.sh
 
-#Abilito i servizi non dipendenti da programmi esterni:
+USER_SERVICES_LOCATION="$HOME/.config/systemd/user"
+mkdir -p "$USER_SERVICES_LOCATION"
+
+# Copio le unit (service e timer) nella location corretta
+cp -r ../systemd/user/*.service ../systemd/user/*.timer "$USER_SERVICES_LOCATION"/
+
 systemctl --user daemon-reload
-systemctl --user enable --now downloadAnime.timer flatpak-update.timer rsync.timer
 
+# Abilito i servizi e i timer effettivamente in uso
+systemctl --user enable --now anidownloader-check.timer anidownloaderd.service flatpak-update.timer invia-watt.timer rsync_sync.timer
+systemctl --user enable sunshine.service xbox-monitor.service
+
+echo "Installazione dei servizi completata."

@@ -7,3 +7,6 @@ __pycache__
 dist
 build
 AniDownloader.*
+protonvpn_reconnect.service
+
+.mypy_cache

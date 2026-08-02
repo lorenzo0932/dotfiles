@@ -5,4 +5,5 @@ Description=Script di sincronizzazione rsync
 Type=oneshot
 WorkingDirectory=/home/lorenzo/.local/share/myScript/rSync
 EnvironmentFile=/home/lorenzo/.local/share/myScript/rSync/gemini.env
+ExecStartPre=/home/lorenzo/.local/share/myScript/ExportGnomeExtensions/ExportGnomeExtensions.sh
 ExecStart=/home/lorenzo/.local/share/myScript/rSync/rSync.sh

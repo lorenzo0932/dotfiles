@@ -4,32 +4,34 @@ This directory contains systemd user-level unit files (`.service` and `.timer`) 
 
 ## Services (`.service` files)
 
-*   **[HomeAssistant.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/HomeAssistant.service)**: Initializes and runs local Home Assistant services.
-*   **[homeassistant-failure.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/homeassistant-failure.service)**: Run-on-failure handler for Home Assistant to automate error recovery.
+*   **[anidownloaderd.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/anidownloaderd.service)**: Headless AniDownloader daemon.
 *   **[Shutdown.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/Shutdown.service)**: Implements automated system power shutdown routines.
 *   **[flatpak-update.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/flatpak-update.service)**: Triggers auto-updates for installed Flatpaks.
-*   **[invia-watt.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/invia-watt.service)**: Runs power consumption reporting to Home Assistant.
+*   **[invia-watt.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/invia-watt.service)**: Runs power consumption reporting to Home Assistant (reads `MQTT_PASS` from `~/.config/mqtt.env` via `EnvironmentFile`).
 *   **[jellyfin-backup.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/jellyfin-backup.service)**: Triggers backups of Jellyfin configurations.
-*   **[lmstudio.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/lmstudio.service)**: Serves local Large Language Models via LM Studio.
-*   **[protonvpn_reconnect.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/protonvpn_reconnect.service)**: Keeps ProtonVPN connection stable through reconnections.
+*   **[lmstudio.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/lmstudio.service)**: Serves local Large Language Models via LM Studio. Disabled by default.
 *   **[rsync_sync.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/rsync_sync.service)**: Runs the rSync synchronization script for backing up dotfiles/settings.
 *   **[sunshine.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/sunshine.service)**: Sunshine Game Streaming server host daemon.
 *   **[xbox-monitor.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/xbox-monitor.service)**: Monitors system events related to Xbox gamepad connectivity.
 *   **[ytdlp2strm.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/ytdlp2strm.service)**: Stream-handler that formats YT-DLP videos into streamable outputs.
 
+> Nota: `protonvpn_reconnect.service` è installata e gestita automaticamente dall'app ProtonVPN, quindi è esclusa dal backup (`exclude.txt`).
+
 ## Timers (`.timer` files)
 
-*   **[HomeAssistant.timer](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/HomeAssistant.timer)**: Sets periodic execution rules for Home Assistant service checks.
+*   **[anidownloader-check.timer](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/anidownloader-check.timer)**: Checks AniDownloader periodically.
 *   **[Shutdown.timer](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/Shutdown.timer)**: Timer to trigger automatic machine shutdown.
 *   **[flatpak-update.timer](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/flatpak-update.timer)**: Schedules daily Flatpak package updates.
 *   **[invia-watt.timer](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/invia-watt.timer)**: Regularly runs the power usage reporter script.
 *   **[jellyfin-backup.timer](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/jellyfin-backup.timer)**: Periodically triggers the backup of Jellyfin configuration files.
-*   **[lmstudio.timer](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/lmstudio.timer)**: Triggers periodic LM Studio checks/tasks.
+*   **[lmstudio.timer](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/lmstudio.timer)**: Triggers periodic LM Studio checks/tasks. Disabled by default.
 *   **[rsync_sync.timer](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/rsync_sync.timer)**: Runs the repository dotfile syncing script at set intervals.
 
 ## Target Dependencies (`.target.wants/` folders)
 
 *   **[default.target.wants/](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/default.target.wants/)**: Symlink to units launched at generic session startup:
+    - `anidownloader-check.timer`
+    - `anidownloaderd.service`
     - `onedriver@home-lorenzo-.OneDriveUnipi.service`
 *   **[gnome-session.target.wants/](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/gnome-session.target.wants/)**: Services launched upon GNOME session initialization:
     - `gnome-remote-desktop.service`
@@ -39,7 +41,6 @@ This directory contains systemd user-level unit files (`.service` and `.timer`) 
 *   **[timers.target.wants/](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/timers.target.wants/)**: Auto-activated timers:
     - `flatpak-update.timer`
     - `invia-watt.timer`
-    - `lmstudio.timer`
     - `rsync_sync.timer`
 
 ---

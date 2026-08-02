@@ -34,10 +34,10 @@ To use these scripts, follow the steps below:
 
 ### Script Descriptions:
 
-*   **`installMPV.sh`**: Installs an advanced MPV configuration, including custom scripts, shaders, and fonts, offering enhanced video playback capabilities. It prompts the user to choose between a native or Flatpak MPV installation.
-*   **`installNautilusScripts.sh`**: Copies custom Nautilus scripts to the appropriate directory, making them available for use within the Nautilus file manager. These scripts provide additional functionalities for file management.
-*   **`installScripts.sh`**: Copies all custom bash scripts from the `myScript` directory and its subfolders to a designated location, then adds these script directories to the system's PATH, allowing them to be executed from any terminal location.
-*   **`installServices.sh`**: Installs and enables various user-level systemd services, such as timers for `downloadAnime`, `flatpak-update`, and `rsync`, automating background tasks.
+*   **`installMPV.sh`**: Installs the MPV configuration (synced from `~/.config/mpv`) to the selected MPV config directory (native or Flatpak), including custom scripts, shaders, and fonts.
+*   **`installNautilusScripts.sh`**: Copies the Nautilus context menu scripts (from `nautilus/scripts/`) to `~/.local/share/nautilus/scripts/`, making them available within the Nautilus file manager.
+*   **`installScripts.sh`**: Copies the `myScript` directory to `~/.local/share/myScript` (without overwriting newer local files), then adds the script directories to the system's PATH, allowing them to be executed from any terminal location.
+*   **`installServices.sh`**: Installs the systemd user units in `~/.config/systemd/user/` and enables the ones in use (AniDownloader, Flatpak updates, invia-watt, rsync sync, Sunshine, Xbox monitor).
 
 ### Important Notes:
 
