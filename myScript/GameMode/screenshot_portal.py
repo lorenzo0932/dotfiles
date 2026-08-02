@@ -19,7 +19,7 @@ gi.require_version("Gio", "2.0")
 gi.require_version("Gst", "1.0")
 from gi.repository import Gio, GLib, Gst
 
-INTERVAL = 5
+INTERVAL = 1
 ALPHA = 0.35
 # Smoothing adattivo per intervalli di delta hue (circolare):
 # drift -> fast -> bypass, come i filtri SOTA sui cut.

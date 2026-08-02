@@ -1,11 +1,11 @@
 #!/bin/bash
 # Ambilight: la LED strip segue i colori dello schermo durante il gioco.
-# Hook [custom] di gamemode: start -> daemon screenshot (ScreenCast stealth),
-# end -> SIGTERM al daemon che pubblica fedora/light/end e chiude la sessione.
+# Hook [custom] di gamemode: start -> avvia ambilight.service (systemd user),
+# end -> stop (SIGTERM al daemon che pubblica fedora/light/end e chiude la sessione).
 SELF="$(readlink -f "$0")"
 DIR="$(dirname "$SELF")"
 MQTT_HOST="192.168.1.39"
-PIDFILE="/tmp/ambilight_daemon.pid"
+SERVICE="ambilight.service"
 
 conf_load() {
     if [ -f "$HOME/.config/mqtt.env" ]; then
@@ -24,23 +24,20 @@ publish() {
 }
 
 start() {
-    conf_load
-    if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-        echo "ambilight già attivo (pid $(cat "$PIDFILE"))"
+    if systemctl --user is-active --quiet "$SERVICE"; then
+        echo "ambilight gia' attivo ($SERVICE)"
         return 0
     fi
-    publish fedora/light/start 1
-    nohup python3 "$DIR/screenshot_portal.py" daemon >/dev/null 2>&1 &
-    echo "daemon ambilight avviato (pid $!)"
+    systemctl --user start "$SERVICE"
+    echo "ambilight avviato ($SERVICE)"
 }
 
 end() {
-    if [ -f "$PIDFILE" ]; then
-        kill -TERM "$(cat "$PIDFILE")" 2>/dev/null
-        rm -f "$PIDFILE"
-        echo "daemon ambilight terminato"
+    if systemctl --user is-active --quiet "$SERVICE"; then
+        systemctl --user stop "$SERVICE"
+        echo "ambilight terminato ($SERVICE)"
     else
-        # fallback: pubblica direttamente se il daemon non c'e'
+        # fallback: pubblica direttamente se il servizio non e' attivo
         conf_load
         publish fedora/light/end 1
     fi
