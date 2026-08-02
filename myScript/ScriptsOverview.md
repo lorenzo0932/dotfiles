@@ -20,6 +20,20 @@ Utilities to dump and reload custom desktop keybindings.
 ### 4. [GameMode](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/)
 Custom game-related scripts.
 *   [openSteamAtConnection.py](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/openSteamAtConnection.py): Python utility to trigger Steam startup upon detecting a connection.
+*   [screenshot_portal.py](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/screenshot_portal.py): Ambilight daemon (XDG ScreenCast portal + GStreamer, avviato da gamemode via `ambilight.sh`). Pubblica il colore dominante dello schermo su MQTT (`fedora/light/led/color` e `fedora/light/cam/color`); HA applica hue/sat/bri alle luci.
+*   [ambilight.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/ambilight.sh): Hook gamemode che avvia/ferma `ambilight.service` (systemd user).
+
+#### Ambilight: design rationale (v7.6)
+Obiettivo: transizioni "cinematiche" — pochi cambi di colore, ognuno un fade lungo e fluido. Le luci hanno il fade hardware (strip LED: dp localtuya 26=150, ~35°/s; luce camera: fade nativo), quindi il daemon **non** deve mandare step intermedi (persi comunque, limite 500ms di polling localtuya).
+
+Catena di filtri nel daemon (in ordine, costanti in cima a `screenshot_portal.py`):
+1. **Estrazione**: istogramma HSV a 18 bin pesato per energia (sat×val); il colore è la **media gaussiana dei bin attorno al bin vincente** (σ=2 bin ≈ 40°): aree piccole ma sature (mani, oggetti in movimento) non spostano il colore. Scena quasi senza colore (<1.2% di energia) → nessun publish.
+2. **Color lock** (`LOCK_DEG=25`, finestra 4 tick ≈ 2.8s): si pubblica solo se gli ultimi 4 hue rilevati stanno entro ±25° — i flash brevi (<2s, esplosioni, lampi) non vengono mai pubblicati (replica il "lock" di Philips Hue Sync).
+3. **Cooldown** (`COOLDOWN=6s`): al massimo 1 publish ogni 6s, così il fade hardware arriva SEMPRE a destinazione prima del prossimo cambio (mai fade interrotti → niente scatti).
+4. **Deadband**: publish solo se il target dista ≥30° di hue o ≥0.2 di saturazione dall'ultimo colore inviato. Luminosità **fissa** (`BRIGHT_FIXED=80`): il colore segue la scena, la bri no (evita il tremolio da variazioni continue di luminanza).
+5. **Timing**: `INTERVAL=0.7s` tra le analisi (misurato: a 500ms i comandi localtuya si perdono, a 700ms 100% affidabile).
+
+Da NON rifare senza motivo: misurare di nuovo i limiti localtuya, ridurre cooldown/lock (si torna ai fade interrotti), o inseguire il colore a ogni tick (flip + scatti). Limite noto accettato: il percorso del fade lo decide il firmware della strip (interpolazione RGB, non percettiva).
 
 ### 5. [HomeAssistant](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/HomeAssistant/)
 Integrations and statistics tracking for Home Assistant (HA).

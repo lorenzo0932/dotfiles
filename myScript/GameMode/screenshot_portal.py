@@ -7,6 +7,7 @@ dominante (numpy vettorizzato) e pubblica "h,s,b" via MQTT.
 Alla terminazione pubblica fedora/light/end e chiude la sessione.
 Uso: screenshot_portal.py daemon
 """
+import collections
 import json
 import os
 import secrets
@@ -34,6 +35,9 @@ INTERVAL = 0.7        # secondi tra un'analisi colore e l'altra
 PUB_HUE_DEG = 30.0    # soglia minima di spostamento hue per pubblicare
 PUB_SAT_DELTA = 0.2   # soglia minima di variazione saturazione
 COOLDOWN = 6.0        # intervallo minimo (s) tra due publish
+LOCK_DEG = 25.0       # color lock: i target hue degli ultimi ~4 tick devono
+                      # stare dentro questa banda, altrimenti la scena e'
+                      # instabile (flash brevi) e non si pubblica nulla
 BRIGHT_FIXED = 80     # luminosita' pct fissa: il colore segue la scena, la bri no
 # Stabilita' del colore: la tinta e' la media gaussiana pesata dei bin hue
 # attorno al bin con piu' energia (sigma ~40°), quindi aree piccole ma sature
@@ -49,6 +53,7 @@ loop = GLib.MainLoop()
 
 s = {"session": None, "node": None, "fd": None, "restore_token": None,
      "cur_hsv": None, "last_pub": None, "last_pub_time": 0.0,
+     "hhist": collections.deque(maxlen=4),
      "pipeline": None, "last_frame": None, "frame_seq": 0, "running": True}
 lock = threading.Lock()
 
@@ -399,12 +404,27 @@ def publish_color(frame):
         return
     th, ts, tv, hue_label = res
     ts = max(ts, 0.45)
+    s["hhist"].append(th)
     # Cooldown: tra un publish e il successivo passa almeno COOLDOWN secondi,
     # cosi' il fade hardware arriva a destinazione prima del prossimo cambio.
     now = time.time()
     if now - s["last_pub_time"] < COOLDOWN:
         log(f"cooldown: prossimo publish tra {COOLDOWN - (now - s['last_pub_time']):.1f}s")
         return
+    # Color lock: il colore viene applicato solo se la scena e' stabile
+    # (gli ultimi ~4 tick entro LOCK_DEG l'uno dall'altro). Un flash breve
+    # non fa cambiare le luci: il nuovo colore deve persistere ~3s.
+    hh = list(s["hhist"])
+    if len(hh) >= 2:
+        spread = 0.0
+        for i in range(len(hh)):
+            for j in range(i + 1, len(hh)):
+                d = abs((hh[i] - hh[j] + 0.5) % 1.0 - 0.5)
+                if d > spread:
+                    spread = d
+        if spread > LOCK_DEG / 360.0:
+            log(f"colore instabile (spread {spread * 360:.0f}°): nessun publish")
+            return
     # Publish solo quando la scena si e' allontanata oltre la soglia.
     lp = s["last_pub"]
     if lp is not None:
