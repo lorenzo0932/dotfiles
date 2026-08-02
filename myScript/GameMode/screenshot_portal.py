@@ -334,7 +334,7 @@ def dominant_hsv(rgb):
     energy = sat * val
     if energy.sum() < 0.012 * r.size:
         # scena quasi senza colore: ambra soffusa
-        th, ts, tv = 200 / 360, 0.75, 0.45
+        th, ts, tv = colorsys_hsv(200 / 255, 150 / 255, 60 / 255)
         return th, ts, tv, "fallback"
     nbins = 18
     bi = (hue * nbins).astype(np.int64).ravel() % nbins
