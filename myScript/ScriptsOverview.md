@@ -20,7 +20,7 @@ Utilities to dump and reload custom desktop keybindings.
 ### 4. [GameMode](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/)
 Custom game-related scripts.
 *   [openSteamAtConnection.py](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/openSteamAtConnection.py): Python utility to trigger Steam startup upon detecting a connection.
-*   [screenshot_portal.py](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/screenshot_portal.py): Ambilight daemon (XDG ScreenCast portal + GStreamer, avviato da gamemode via `ambilight.sh`). Pubblica il colore dominante dello schermo su MQTT (`fedora/light/led/color` e `fedora/light/cam/color`); HA applica hue/sat/bri alle luci.
+*   [screenshot_portal.py](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/screenshot_portal.py): Ambilight daemon (XDG ScreenCast portal + GStreamer, avviato da gamemode via `ambilight.sh`). Pubblica il colore dominante dello schermo su MQTT (`fedora/light/led/color`); HA applica hue/sat/bri alla strip LED. La luce camera è esclusa dal loop.
 *   [ambilight.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/ambilight.sh): Hook gamemode che avvia/ferma `ambilight.service` (systemd user).
 
 #### Ambilight: design rationale (v7.6)
