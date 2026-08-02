@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Ambilight daemon: sessione ScreenCast XDG portal (v6) + GStreamer.
-Cattura un frame ogni INTERVAL secondi, calcola il colore dominante e lo
-pubblica via MQTT (fedora/light/color). Niente flash/suono/grab input.
+"""Ambilight daemon: sessione ScreenCast XDG portal (v7) + GStreamer appsink.
+Pipeline PERSISTENTE: pipewiresrc -> videoconvert -> videoscale -> appsink
+gira in continuo (niente pngenc/filesink/magick per frame). Un thread
+campiona l'ultimo frame; un timer GLib ogni INTERVAL calcola il colore
+dominante (numpy vettorizzato) e pubblica "h,s,b" via MQTT.
 Alla terminazione pubblica fedora/light/end e chiude la sessione.
-Uso: screenshot_portal.py daemon   (start/end restano in ambilight.sh)
+Uso: screenshot_portal.py daemon
 """
 import json
 import os
@@ -11,15 +13,18 @@ import secrets
 import signal
 import subprocess
 import sys
+import threading
 import time
-import colorsys
+
+import numpy as np
 
 import gi
 gi.require_version("Gio", "2.0")
 gi.require_version("Gst", "1.0")
-from gi.repository import Gio, GLib, Gst
+gi.require_version("GstApp", "1.0")
+from gi.repository import Gio, GLib, Gst, GstApp
 
-INTERVAL = 2
+INTERVAL = 1.0        # secondi tra un'analisi colore e l'altra
 ALPHA = 0.35
 # Smoothing adattivo per intervalli di delta hue (circolare):
 # drift -> fast -> bypass, come i filtri SOTA sui cut.
@@ -27,10 +32,11 @@ HUE_SMOOTH_MAX = 50     # <= 50° : drift lento
 HUE_FAST_MAX = 120      # 50-120°: fast chase (1-2 grab)
 HUE_SNAP_DEG = 120      # > 120° : bypass (target immediato)
 HUE_HYSTERESIS = 12     # niente oscillazioni entro 12°
+BRIGHT_MIN = 35         # luminosita' pct minima (scena scura)
+BRIGHT_MAX = 80         # luminosita' pct massima (scena chiara)
 MQTT_HOST = "192.168.1.39"
 STATE_DIR = os.path.expanduser("~/.local/state/ambilight")
 STATE_FILE = os.path.join(STATE_DIR, "screencast.json")
-SHOT = "/tmp/ambilight_shot.png"
 LOG = os.path.join(STATE_DIR, "ambilight.log")
 
 Gst.init(None)
@@ -38,7 +44,9 @@ bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 loop = GLib.MainLoop()
 
 s = {"session": None, "node": None, "fd": None, "restore_token": None,
-     "grab_in_progress": False, "cur_hsv": None}
+     "cur_hsv": None, "pipeline": None, "last_frame": None,
+     "frame_seq": 0, "running": True}
+lock = threading.Lock()
 
 
 def log(msg):
@@ -230,140 +238,163 @@ def open_pipewire():
         Gio.UnixFDList(), None, on_fd)
 
 
-# ---------- fase grab ----------
+# ---------- fase pipeline persistente ----------
 
 def loop_ready():
     log("loop avviato")
-    GLib.timeout_add_seconds(INTERVAL, grab)
-    grab()
+    desc = (f"pipewiresrc fd={s['fd']} path={s['node']} "
+            f"! videoconvert ! videoscale ! video/x-raw,width=240,format=RGB "
+            f"! appsink name=sink emit-signals=True max-buffers=1 drop=True")
+    pipeline = Gst.parse_launch(desc)
+    s["pipeline"] = pipeline
+    bus_msg = pipeline.get_bus()
+    bus_msg.add_signal_watch()
+
+    def on_bus_msg(bus_obj, msg):
+        if msg.type == Gst.MessageType.ERROR:
+            err, dbg = msg.parse_error()
+            log(f"gstreamer err: {err.message} ({dbg})")
+        elif msg.type == Gst.MessageType.EOS:
+            log("gstreamer EOS")
+
+    bus_msg.connect("message", on_bus_msg)
+    sink = pipeline.get_by_name("sink")
+    sink.connect("new-sample", on_new_sample)
+    pipeline.set_state(Gst.State.PLAYING)
+    GLib.timeout_add(int(INTERVAL * 1000), analyze)
+    analyze()
 
 
-def grab():
-    if s["grab_in_progress"]:
+def on_new_sample(sink):
+    sample = sink.pull_sample()
+    if sample is None:
+        return Gst.FlowReturn.OK
+    buf = sample.get_buffer()
+    caps = sample.get_caps()
+    if caps is None:
+        return Gst.FlowReturn.OK
+    info = caps.get_structure(0)
+    ok_w, w = info.get_int("width")
+    ok_h, h = info.get_int("height")
+    if not (ok_w and ok_h):
+        return Gst.FlowReturn.OK
+    success, mapinfo = buf.map(Gst.MapFlags.READ)
+    if not success:
+        return Gst.FlowReturn.OK
+    try:
+        n = w * h * 3
+        arr = np.frombuffer(mapinfo.data, dtype=np.uint8)
+        if arr.size >= n:
+            frame = arr[:n].reshape(h, w, 3).copy()
+            with lock:
+                s["frame_seq"] += 1
+                s["last_frame"] = frame
+    finally:
+        buf.unmap(mapinfo)
+    return Gst.FlowReturn.OK
+
+
+def analyze():
+    with lock:
+        frame = s["last_frame"]
+    if frame is None:
+        log("nessun frame ancora")
         return True
-    s["grab_in_progress"] = True
-    run_pipeline()
+    t0 = time.perf_counter()
+    publish_color(frame)
+    dt = (time.perf_counter() - t0) * 1000
+    log(f"analisi: {dt:.0f}ms")
     return True
 
 
-def run_pipeline():
-    node, fd = s["node"], s["fd"]
-    desc = (f"pipewiresrc fd={fd} path={node} num-buffers=1 "
-            f"! videoconvert ! videoscale ! video/x-raw,width=240 "
-            f"! pngenc ! filesink location={SHOT}")
-    pipeline = Gst.parse_launch(desc)
-    done = {"ok": False}
-    grab_loop = GLib.MainLoop()
-    timer_id = {"id": None}
+def dominant_hsv(rgb):
+    """Colore 'energia' dominante: tinta con piu' energia cumulativa
+    (sat x lum x copertura). Ritorna (h, s, v) in [0,1)."""
+    f = rgb.astype(np.float64) / 255.0
+    r, g, b = f[..., 0], f[..., 1], f[..., 2]
+    mx = np.maximum(np.maximum(r, g), b)
+    mn = np.minimum(np.minimum(r, g), b)
+    d = mx - mn
+    hue = np.zeros_like(r)
+    sat = np.zeros_like(r)
+    m = d > 0
+    if m.any():
+        denom = np.where(mx[m] == 0, 1.0, mx[m])
+        sat[m] = d[m] / denom
+        hr = np.zeros_like(r)
+        hr[m] = ((g[m] - b[m]) / d[m]) % 6
+        hg = np.zeros_like(r)
+        hg[m] = ((b[m] - r[m]) / d[m] + 2)
+        hb = np.zeros_like(r)
+        hb[m] = ((r[m] - g[m]) / d[m] + 4)
+        # dove mx==r -> hr; mx==g -> hg; altrimenti hb
+        hue[m] = np.where(mx[m] == r[m], hr[m],
+                          np.where(mx[m] == g[m], hg[m], hb[m])) / 6.0
+    val = mx
+    energy = sat * val
+    if energy.sum() < 0.012 * r.size:
+        # scena quasi senza colore: ambra soffusa
+        th, ts, tv = 200 / 360, 0.75, 0.45
+        return th, ts, tv, "fallback"
+    nbins = 18
+    bi = (hue * nbins).astype(np.int64).ravel() % nbins
+    bsum = np.bincount(bi, weights=energy.ravel(), minlength=nbins)
+    best = int(np.argmax(bsum))
+    mbin = (hue * nbins).astype(np.int64).ravel() % nbins == best
+    mbin = mbin.reshape(r.shape)
+    r_m = float(r[mbin].mean())
+    g_m = float(g[mbin].mean())
+    b_m = float(b[mbin].mean())
+    th, ts, tv = colorsys_hsv(r_m, g_m, b_m)
+    return th, ts, tv, f"h{int(th * 360)}"
 
-    def guard():
-        log("grab: timeout 4s")
-        grab_loop.quit()
 
-    def on_bus_msg(bus_obj, msg):
-        t = msg.type
-        if t == Gst.MessageType.EOS:
-            done["ok"] = os.path.isfile(SHOT) and os.path.getsize(SHOT) > 0
-            grab_loop.quit()
-        elif t == Gst.MessageType.ERROR:
-            err, dbg = msg.parse_error()
-            log(f"gstreamer err: {err.message} ({dbg})")
-            grab_loop.quit()
-
-    bus_msg = pipeline.get_bus()
-    bus_msg.add_signal_watch()
-    bus_msg.connect("message", on_bus_msg)
-    pipeline.set_state(Gst.State.PLAYING)
-    timer_id["id"] = GLib.timeout_add_seconds(4, guard)
-    grab_loop.run()
-    if timer_id["id"] is not None:
-        GLib.source_remove(timer_id["id"])
-    pipeline.set_state(Gst.State.NULL)
-    bus_msg.remove_signal_watch()
-    s["grab_in_progress"] = False
-    if done["ok"]:
-        publish_color()
-        log("grab ok")
-    else:
-        log("grab fallito")
+def colorsys_hsv(r, g, b):
+    import colorsys
+    return colorsys.rgb_to_hsv(max(0.0, min(1.0, r)),
+                               max(0.0, min(1.0, g)),
+                               max(0.0, min(1.0, b)))
 
 
-def publish_color():
-    # Colore "energia" dominante: la tinta con piu' energia cumulativa nel
-    # frame (saturazione x luminosita' x copertura). Uscita SEMPRE satura
-    # (s>=0.45): la striscia Tuya e' HS-mode e rende male i grigi/pastello,
-    # quindi si pubblica la tinta piena invece della media che sbiadisce.
-    try:
-        out = subprocess.run(
-            ["magick", SHOT, "-resize", "12x6!", "-alpha", "off", "-depth", "8",
-             "rgb:-"],
-            capture_output=True, timeout=10)
-        raw = out.stdout
-        px = []
-        for i in range(0, len(raw) - 2, 3):
-            rr, gg, bb = raw[i], raw[i + 1], raw[i + 2]
-            h, sa, v = colorsys.rgb_to_hsv(rr / 255, gg / 255, bb / 255)
-            px.append((rr, gg, bb, h, sa, v))
-        if len(px) < 6:
-            return
-        n = len(px)
-        total_e = sum(sa * v for _, _, _, _, sa, v in px)
-        hue_label = "fallback"
-        if total_e < 0.012 * n:
-            # scena quasi senza colore: niente grigio "strano", ambra soffusa
-            th, ts, tv = colorsys.rgb_to_hsv(200 / 255, 150 / 255, 60 / 255)
+def publish_color(frame):
+    th, ts, tv, hue_label = dominant_hsv(frame)
+    ts = max(ts, 0.45)
+    # smoothing adattivo in HSV (hue circolare): drift per cambi piccoli,
+    # bypass per i cambi di scena (niente attraversamento di colori intermedi).
+    a = ALPHA
+    cur = s["cur_hsv"]
+    if cur:
+        dv = (th - cur[0] + 0.5) % 1.0 - 0.5
+        d_h = abs(dv) * 360
+        if d_h < HUE_HYSTERESIS:
+            dv = 0.0
+        if d_h <= HUE_SMOOTH_MAX:
+            a = ALPHA
+        elif d_h <= HUE_FAST_MAX:
+            a = 0.9
         else:
-            nbins = 18
-            bsum = [0.0] * nbins
-            bpx = [[] for _ in range(nbins)]
-            for k, (rr, gg, bb, h, sa, v) in enumerate(px):
-                bi = int(h * nbins) % nbins
-                bsum[bi] += sa * v
-                bpx[bi].append(k)
-            best = max(range(nbins), key=lambda k: bsum[k])
-            grp = bpx[best]
-            cnt = len(grp)
-            r = sum(px[k][0] for k in grp) // cnt
-            g = sum(px[k][1] for k in grp) // cnt
-            b = sum(px[k][2] for k in grp) // cnt
-            th, ts, tv = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
-            hue_label = f"h{int(th * 360)}"
-        ts = max(ts, 0.45)
-        tv = max(tv, 0.5)
-        # smoothing adattivo in HSV (hue circolare). Il fattore alpha dipende
-        # dalla distanza circolare: drift per cambi piccoli, bypass per i
-        # cambi di scena (niente attraversamento di colori intermedi).
-        a = ALPHA
-        cur = s["cur_hsv"]
-        if cur:
-            dv = (th - cur[0] + 0.5) % 1.0 - 0.5
-            d_h = abs(dv) * 360
-            if d_h < HUE_HYSTERESIS:
-                dv = 0.0
-            if d_h <= HUE_SMOOTH_MAX:
-                a = ALPHA
-            elif d_h <= HUE_FAST_MAX:
-                a = 0.9
-            else:
-                a = 1.0
-            th = (cur[0] + dv * a) % 1.0
-            ts = cur[1] * (1 - ALPHA) + ts * ALPHA
-            tv = cur[2] * (1 - ALPHA) + tv * ALPHA
-        s["cur_hsv"] = (th, ts, tv)
-        r, g, b = (round(c * 255) for c in colorsys.hsv_to_rgb(th, ts, tv))
-        color = f"{r},{g},{b}"
-        mqtt_pub("fedora/light/color", color)
-        log(f"colore pubblicato: {color} [{hue_label} s={ts:.2f} a={a:.2f}]")
-    except Exception as e:
-        import traceback
-        log(f"colore err: {e}\n{traceback.format_exc()}")
+            a = 1.0
+        th = (cur[0] + dv * a) % 1.0
+        ts = cur[1] * (1 - ALPHA) + ts * ALPHA
+        tv = cur[2] * (1 - ALPHA) + tv * ALPHA
+    s["cur_hsv"] = (th, ts, tv)
+    h_deg = round(th * 360, 1)
+    s_pct = round(ts * 100, 1)
+    b_pct = int(BRIGHT_MIN + tv * (BRIGHT_MAX - BRIGHT_MIN))
+    b_pct = max(BRIGHT_MIN, min(BRIGHT_MAX, b_pct))
+    payload = f"{h_deg},{s_pct},{b_pct}"
+    mqtt_pub("fedora/light/color", payload)
+    log(f"colore pubblicato: {payload} [{hue_label} a={a:.2f}]")
 
 
 # ---------- fine ----------
 
 def shutdown(*_):
     log("terminazione: fine sessione ambilight")
+    s["running"] = False
     mqtt_pub("fedora/light/end", "1")
+    if s["pipeline"] is not None:
+        s["pipeline"].set_state(Gst.State.NULL)
     if s["session"]:
         try:
             bus.call("org.freedesktop.portal.Desktop", s["session"],
