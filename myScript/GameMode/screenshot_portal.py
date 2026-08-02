@@ -333,9 +333,9 @@ def dominant_hsv(rgb):
     val = mx
     energy = sat * val
     if energy.sum() < 0.012 * r.size:
-        # scena quasi senza colore: ambra soffusa
-        th, ts, tv = colorsys_hsv(200 / 255, 150 / 255, 60 / 255)
-        return th, ts, tv, "fallback"
+        # scena quasi senza colore: nessun publish, si mantiene l'ultimo
+        # colore gia' applicato alle luci
+        return None
     nbins = 18
     bi = (hue * nbins).astype(np.int64).ravel() % nbins
     bsum = np.bincount(bi, weights=energy.ravel(), minlength=nbins)
@@ -357,7 +357,11 @@ def colorsys_hsv(r, g, b):
 
 
 def publish_color(frame):
-    th, ts, tv, hue_label = dominant_hsv(frame)
+    res = dominant_hsv(frame)
+    if res is None:
+        log("scena senza colore: nessun publish (ultimo colore mantenuto)")
+        return
+    th, ts, tv, hue_label = res
     ts = max(ts, 0.45)
     # smoothing adattivo in HSV (hue circolare): drift per cambi piccoli,
     # bypass per i cambi di scena (niente attraversamento di colori intermedi).
