@@ -22,6 +22,7 @@ import json
 import os
 import sys
 import time
+import xml.etree.ElementTree as ET
 
 jf, sf = sys.argv[1], sys.argv[2]
 try:
@@ -56,12 +57,14 @@ for s in data:
         continue
     found = False
     if os.path.isdir(base):
-        target = f"ep{ep}".lower()
+        epnum = str(ep).lstrip("0")
         for fn in sorted(os.listdir(base)):
             if not fn.lower().endswith((".mp4", ".mkv")):
                 continue
             tags = [t.strip().lower().replace(" ", "") for t in fn.split("_")]
-            if target not in tags:
+            nums = [t.lstrip("0") for t in tags
+                    if t.isdigit() or (t.startswith("ep") and t[2:].isdigit())]
+            if epnum not in nums:
                 continue
             p = os.path.join(base, fn)
             try:
@@ -71,9 +74,23 @@ for s in data:
                 stable, nonempty = False, False
             if stable and nonempty:
                 found = True
+            title = ""
+            nfo = os.path.splitext(p)[0] + ".nfo"
+            if os.path.isfile(nfo):
+                try:
+                    root = ET.parse(nfo).getroot()
+                    for el in root.iter("title"):
+                        if el.text and el.text.strip():
+                            title = el.text.strip()
+                            break
+                except Exception:
+                    pass
             break
     if found:
-        msgs.append(f"{name}: Ep {ep}")
+        if title:
+            msgs.append(f"{name}: Ep {ep} - {title}")
+        else:
+            msgs.append(f"{name}: Ep {ep}")
         state[name] = ts
         changed = True
 
