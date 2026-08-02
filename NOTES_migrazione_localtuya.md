@@ -95,4 +95,9 @@ Correlazione verificata: la coda del `device_id` contiene i byte del MAC.
 ### Note per il futuro
 - Il cloud (entry `01KXNVNT`, account lorenzo0932@gmail.com) controlla ancora fisicamente i device:
   i DP scritti da localtuya sono gli stessi visti dal cloud (verificato: `2=white`, `3=140`, ecc.).
-- Lease DHCP fisso per .30/.24 ancora da fare (opzionale).
+
+## Riserve DHCP sulla Vodafone Station (create 2026-08-02)
+- LED: MAC `10:52:1C:4C:A1:4E` → `192.168.1.30`
+- Luce camera: MAC `60:01:94:E7:6A:E8` → `192.168.1.24`
+- Box Home Assistant (interfaccia `end0`): MAC `e4:5f:01:e2:86:6b` → `192.168.1.39`
+- Verificate: ping OK e porta 6668 aperta su .30/.24; API HA ok su .39.
