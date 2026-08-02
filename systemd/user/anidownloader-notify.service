@@ -1,0 +1,9 @@
+[Unit]
+Description=AniDownloader notifica download completati
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/lorenzo/.local/share/myScript/AniDownloader/notify_downloads.sh
+StandardOutput=journal
+StandardError=journal

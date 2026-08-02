@@ -1,0 +1,13 @@
+[Unit]
+Description=AniDownloader notifica periodica download completati
+Requires=anidownloader-notify.service
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=10min
+OnClockChange=true
+OnTimezoneChange=true
+Persistent=true
+
+[Install]
+WantedBy=default.target
