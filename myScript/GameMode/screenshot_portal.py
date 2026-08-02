@@ -12,6 +12,7 @@ import signal
 import subprocess
 import sys
 import time
+import colorsys
 
 import gi
 gi.require_version("Gio", "2.0")
@@ -280,51 +281,63 @@ def run_pipeline():
         log("grab fallito")
 
 
-def _clamp(v):
-    return max(0, min(255, v))
-
-
 def publish_color():
-    # Media dei pixel piu' luminosi (top 40%) invece della media totale:
-    # zone nere (letterbox/sfondi) non soffocano il colore della scena.
+    # Colore "energia" dominante: la tinta con piu' energia cumulativa nel
+    # frame (saturazione x luminosita' x copertura). Uscita SEMPRE satura
+    # (s>=0.45): la striscia Tuya e' HS-mode e rende male i grigi/pastello,
+    # quindi si pubblica la tinta piena invece della media che sbiadisce.
     try:
         out = subprocess.run(
-            ["magick", SHOT, "-resize", "40x25!", "-alpha", "off", "-depth", "8",
+            ["magick", SHOT, "-resize", "12x6!", "-alpha", "off", "-depth", "8",
              "rgb:-"],
             capture_output=True, timeout=10)
         raw = out.stdout
-        px = [(max(raw[i], raw[i + 1], raw[i + 2]), raw[i], raw[i + 1], raw[i + 2])
-              for i in range(0, len(raw) - 2, 3)]
-        if len(px) < 10:
+        px = []
+        for i in range(0, len(raw) - 2, 3):
+            rr, gg, bb = raw[i], raw[i + 1], raw[i + 2]
+            h, sa, v = colorsys.rgb_to_hsv(rr / 255, gg / 255, bb / 255)
+            px.append((rr, gg, bb, h, sa, v))
+        if len(px) < 6:
             return
-        px.sort(reverse=True)
-        cut = max(8, int(len(px) * 0.4))
-        top = px[:cut]
-        r = sum(p[1] for p in top) // cut
-        g = sum(p[2] for p in top) // cut
-        b = sum(p[3] for p in top) // cut
-        # boost saturazione: allarga lo scarto dalla media grigia
-        gray = (r + g + b) // 3
-        r = _clamp(gray + int((r - gray) * 1.3))
-        g = _clamp(gray + int((g - gray) * 1.3))
-        b = _clamp(gray + int((b - gray) * 1.3))
-        # luminosita' minima per una LED visibile (senza alterare la tinta)
-        lum = max(r, g, b)
-        if lum < 90:
-            lift = 90 - lum
-            r, g, b = _clamp(r + lift), _clamp(g + lift), _clamp(b + lift)
+        n = len(px)
+        total_e = sum(sa * v for _, _, _, _, sa, v in px)
+        hue_label = "fallback"
+        if total_e < 0.012 * n:
+            # scena quasi senza colore: niente grigio "strano", ambra soffusa
+            r, g, b = 200, 150, 60
+        else:
+            nbins = 18
+            bsum = [0.0] * nbins
+            bpx = [[] for _ in range(nbins)]
+            for k, (rr, gg, bb, h, sa, v) in enumerate(px):
+                bi = int(h * nbins) % nbins
+                bsum[bi] += sa * v
+                bpx[bi].append(k)
+            best = max(range(nbins), key=lambda k: bsum[k])
+            grp = bpx[best]
+            cnt = len(grp)
+            r = sum(px[k][0] for k in grp) // cnt
+            g = sum(px[k][1] for k in grp) // cnt
+            b = sum(px[k][2] for k in grp) // cnt
+            hh, ss, vv = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            vv = max(vv, 0.5)
+            ss = max(ss, 0.45)
+            r, g, b = (round(c * 255) for c in colorsys.hsv_to_rgb(hh, ss, vv))
+            hue_label = f"h{int(hh * 360)}"
         # smoothing: scorre verso il nuovo colore invece di saltarci
         cur = s["cur_color"]
         if cur:
-            r = int(r * 0.5 + cur[0] * 0.5)
-            g = int(g * 0.5 + cur[1] * 0.5)
-            b = int(b * 0.5 + cur[2] * 0.5)
+            r = int(r * 0.48 + cur[0] * 0.52)
+            g = int(g * 0.48 + cur[1] * 0.52)
+            b = int(b * 0.48 + cur[2] * 0.52)
         s["cur_color"] = (r, g, b)
         color = f"{r},{g},{b}"
         mqtt_pub("fedora/light/color", color)
-        log(f"colore pubblicato: {color}")
+        _, ssat, _v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+        log(f"colore pubblicato: {color} [{hue_label} s={ssat:.2f}]")
     except Exception as e:
-        log(f"colore err: {e}")
+        import traceback
+        log(f"colore err: {e}\n{traceback.format_exc()}")
 
 
 # ---------- fine ----------
