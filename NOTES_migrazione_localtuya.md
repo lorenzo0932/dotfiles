@@ -40,7 +40,7 @@ Correlazione verificata: la coda del `device_id` contiene i byte del MAC.
 3. ✅ Disabilitare (o eliminare) le entity cloud dei 2 device. → **fatto** (rinominate `_cloud` e disabilitate).
 4. ✅ Aggiornare `automations.yaml` (ambilight + esci/entra casa) con le nuove entity. → **fatto**.
 5. ✅ `automation.reload` + test E2E ambilight (start→color→end) + test colori/temperature. → **fatto**.
-6. Lease DHCP fisso per i 2 MAC. → **da fare (opzionale)**.
+6. ✅ Lease DHCP fisso per i 2 MAC. → **fatto** sulla Vodafone Station (riserve create; verificato: ping OK e porta 6668 aperta su .30/.24).
 7. rSync + push (se si toccano script del repo; le automazioni vivono solo sul box).
 
 ## Problematiche note
