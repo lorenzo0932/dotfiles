@@ -1,4 +1,4 @@
-# myScript/Script cambio schermo/
+# myScript/Display/
 
 This directory contains Bash scripts designed to manage display configurations, specifically for switching between different display outputs (e.g., a desktop monitor and a TV). These scripts are useful for users who frequently change their display setup.
 

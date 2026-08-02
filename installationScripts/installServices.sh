@@ -1,16 +1,19 @@
 #! /bin/bash
 # Installa le unit systemd user nel path corretto e abilita quelle in uso.
+# Funziona da qualsiasi directory di lancio (path risolti rispetto allo script).
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Gli script devono essere installati prima (i servizi li referenziano)
-./installScripts.sh
+"$SCRIPT_DIR/installScripts.sh"
 
 USER_SERVICES_LOCATION="$HOME/.config/systemd/user"
 mkdir -p "$USER_SERVICES_LOCATION"
 
 # Copio le unit (service e timer) nella location corretta
-cp -r ../systemd/user/*.service ../systemd/user/*.timer "$USER_SERVICES_LOCATION"/
+cp -r "$SCRIPT_DIR/../systemd/user/"*.service "$SCRIPT_DIR/../systemd/user/"*.timer "$USER_SERVICES_LOCATION"/
 
 systemctl --user daemon-reload
 

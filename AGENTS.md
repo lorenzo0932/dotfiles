@@ -4,11 +4,11 @@ Repo personale di dotfiles/script: **backup periodico** di una macchina Linux (F
 
 ## Il repo è un mirror, non la fonte di verità
 
-- `myScript/`, `nautilus/`, `systemd/` sono mirror rsync delle dir live: `~/.local/share/myScript`, `~/.local/share/nautilus`, `~/.config/systemd`.
+- `myScript/`, `nautilus/`, `systemd/`, `configs/mpv/` sono mirror rsync delle dir live: `~/.local/share/myScript`, `~/.local/share/nautilus`, `~/.config/systemd`, `~/.config/mpv`.
 - `rSync.sh` (installato in `~/.local/share/myScript/rSync/rSync.sh`, avviato da `rsync_sync.timer`) sincronizza **live → repo con `--delete`**, poi auto-committa e fa push su `origin main`.
-- **Modificare file direttamente nel repo è inutile o pericoloso**: al prossimo rSync vengono sovrascritti (rsync `-u` non copia solo se il dest è più nuovo — e la copia live vince in ogni caso per la regola mpv). Per cambiare una config: modifica il file **live**, poi propaga con `rSync.sh` (o `rSync_NoCommit.sh` per sincronizzare senza committare).
+- **Modificare file direttamente nel repo è inutile o pericoloso**: al prossimo rSync vengono sovrascritti (rsync `-u` non copia solo se il dest è più nuovo). Per cambiare una config: modifica il file **live**, poi propaga con `rSync.sh` (o `rSync_NoCommit.sh` per sincronizzare senza committare).
 - Eccezioni — file che vivono SOLO nel repo e non vengono sovrascritti: `installAll.sh`, `installationScripts/`, `README.md`, `.gitignore`, `tuned_config/`, `AGENTS.md`.
-- `myScript/mpv/` è sincronizzato da una regola dedicata da `~/.config/mpv` (la config reale, escluso `watch_later/`). Nella regola myScript `mpv/` è escluso esplicitamente: non spostare manualmente quella cartella.
+- `configs/mpv/` è sincronizzato da una regola dedicata da `~/.config/mpv` (la config reale, escluso `watch_later/` e `bak/cache/`). Non spostare manualmente quella cartella.
 - `protonvpn_reconnect.service` è gestita dall'app ProtonVPN ed è esclusa dal sync (`exclude.txt`): resta solo in live.
 - `exclude.txt` (in `myScript/rSync/`) esclude dal sync: `*.log`, `__pycache__`, `.mypy_cache`, `dist`, `build`, `gemini.env`, `AniDownloader.*`, ecc. È sia in live che nel repo: modifica la copia live.
 - `~/.config/autostart/` NON è sincronizzato (scelta dell'utente): gli `.desktop` di avvio automatico vivono solo in live.
@@ -36,7 +36,7 @@ Repo personale di dotfiles/script: **backup periodico** di una macchina Linux (F
 
 ## Convenzioni
 
-- Molti nomi di file e commenti sono in **italiano** (es. `Script cambio schermo/`, `Converti e sposta (Burst).sh`): cercare sia in inglese sia in italiano.
+- Molti nomi di file e commenti sono in **italiano** (es. `Converti e sposta (Burst).sh`, `AvviaLockscreen.sh`): cercare sia in inglese sia in italiano. Le **cartelle** di `myScript/` sono invece in inglese senza spazi (AI, Audio, BackupJellyfin, Display, Lockscreen, VideoTools...).
 - Unit systemd e timer attivi da non rompere: `anidownloader-check.timer`, `flatpak-update.timer`, `invia-watt.timer` (ogni 30s), `rsync_sync.timer` (weekly), `sunshine.service`, `xbox-monitor.service`.
 - `lmstudio.service`/`.timer` sono volutamente **disabilitati** (binario `~/.cache/lm-studio/bin/lms` assente finché LM Studio non viene reinstallato).
 - `nautilus/scripts/old/` (versioni vecchie) e `Experimental/` (convertitori sperimentali AV1/Anime4K) sono mantenuti di proposito.

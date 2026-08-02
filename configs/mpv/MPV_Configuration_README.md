@@ -1,4 +1,4 @@
-# myScript/mpv/
+# configs/mpv/
 
 This directory contains a comprehensive set of configuration files, scripts, fonts, and shaders for the MPV media player. It aims to enhance the MPV experience with custom keybindings, advanced playback options, visual improvements, and additional functionalities.
 

@@ -13,9 +13,8 @@ This directory contains systemd user-level unit files (`.service` and `.timer`) 
 *   **[rsync_sync.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/rsync_sync.service)**: Runs the rSync synchronization script for backing up dotfiles/settings.
 *   **[sunshine.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/sunshine.service)**: Sunshine Game Streaming server host daemon.
 *   **[xbox-monitor.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/xbox-monitor.service)**: Monitors system events related to Xbox gamepad connectivity.
-*   **[ytdlp2strm.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/ytdlp2strm.service)**: Stream-handler that formats YT-DLP videos into streamable outputs.
 
-> Nota: `protonvpn_reconnect.service` è installata e gestita automaticamente dall'app ProtonVPN, quindi è esclusa dal backup (`exclude.txt`).
+> Nota: `protonvpn_reconnect.service` è installata e gestita automaticamente dall'app ProtonVPN, quindi è esclusa dal backup (`exclude.txt`). `ytdlp2strm.service` è stata rimossa (tool non più installato).
 
 ## Timers (`.timer` files)
 

@@ -5,8 +5,6 @@ This directory contains Bash scripts and configuration files for automating `rsy
 ## Project Overview
 
 -   `rSync.sh`: Main script for dotfile synchronization and automated Git commits using Gemini API.
--   `rSync_dev.sh`: A development/testing version of `rSync.sh`.
--   `rSync(LMStudio).sh`: A variant script configured to use a local LM Studio server (OpenAI-compatible endpoint) to generate commit messages.
 -   `rSync_NoCommit.sh`: A simple synchronization script that only runs `rsync` without doing any Git operations.
 -   `exclude.txt`: Defines file/directory patterns to be excluded during `rsync` synchronization.
 
@@ -20,7 +18,7 @@ This directory contains Bash scripts and configuration files for automating `rsy
 
 ## Configuration
 
-Before running, edit `rSync.sh` (or `rSync_dev.sh`) to set up:
+Before running, edit `rSync.sh` to set up:
 
 1.  **Source & Destination Paths**:
     Modify the `--- Configuration ---` section:
@@ -33,7 +31,7 @@ Before running, edit `rSync.sh` (or `rSync_dev.sh`) to set up:
 
 2.  **LLM API**:
     Choose and configure your preferred LLM API in the `--- API Configuration ---` section:
-    -   **Google AI (Gemini)**: Set `GOOGLE_API_KEY` (recommended via environment variable or a file, e.g., `~/.config/google-ai-api-key.txt`) and `LLM_MODEL` (default `gemini-2.5-flash`).
+    -   **Google AI (Gemini)**: Set `GOOGLE_API_KEY` (recommended via environment variable or a file, e.g., `~/.config/google-ai-api-key.txt`) and `LLM_MODEL` (default `gemini-3-flash-preview`).
     -   **LM Studio**: Uncomment and configure `LMSTUDIO_API_URL` (e.g., `http://localhost:1234/v1/chat/completions`) and `LMSTUDIO_MODEL` (your LM Studio model name).
 
 3.  **`exclude.txt`**:
@@ -43,6 +41,13 @@ Before running, edit `rSync.sh` (or `rSync_dev.sh`) to set up:
     tracker2-migration-complete
     series_data.json
     gemini.env
+    *.log
+    __pycache__
+    .mypy_cache
+    dist
+    build
+    AniDownloader.*
+    protonvpn_reconnect.service
     ```
     Modify this file to add or remove items you do not want to synchronize.
 
