@@ -5,7 +5,9 @@ gira in continuo (niente pngenc/filesink/magick per frame). Un thread
 campiona l'ultimo frame; un timer GLib ogni INTERVAL calcola il colore
 dominante (numpy vettorizzato) e pubblica "h,s,b" via MQTT.
 Alla terminazione pubblica fedora/light/end e chiude la sessione.
-Uso: screenshot_portal.py daemon
+Uso: screenshot_portal.py daemon [--immersive]
+(con --immersive pubblica lo stesso colore, attenuato, anche sulla luce
+camera: fedora/light/cam/color — il soffitto fa da luce ambiente)
 """
 import collections
 import json
@@ -34,11 +36,37 @@ INTERVAL = 0.7        # secondi tra un'analisi colore e l'altra
 # lungo e continuo che arriva a destinazione, senza interruzioni a meta'.
 PUB_HUE_DEG = 30.0    # soglia minima di spostamento hue per pubblicare
 PUB_SAT_DELTA = 0.2   # soglia minima di variazione saturazione
-COOLDOWN = 6.0        # intervallo minimo (s) tra due publish
+COOLDOWN = 1.0        # intervallo minimo (s) tra due publish
 LOCK_DEG = 25.0       # color lock: i target hue degli ultimi ~4 tick devono
                       # stare dentro questa banda, altrimenti la scena e'
                       # instabile (flash brevi) e non si pubblica nulla
-BRIGHT_FIXED = 80     # luminosita' pct fissa: il colore segue la scena, la bri no
+# --- LUMINOSITA' DINAMICA ---
+# La bri segue la luce TOTALE del monitor (media del canale Value su tutto il
+# frame, NON mascherata): stanza che scende nelle scene scure. Curva gamma per
+# non far "gridare" le scene medie. Vincolo hardware: il controller Tuya fa un
+# bel fade su hue/sat ma si incastra se riceve troppi comandi di SOLA bri; quindi
+# la bri cambia solo con deadband larga (PUB_BRI_DELTA) e holdoff dedicato
+# (BRIGHT_HOLD). Un cambio colore valido fa "cavalcare" la bri nello stesso
+# publish (gratis per il controller)
+BRIGHT_MIN = 25        # luminosita' pct minima (scena scurissima, stanza mai spenta)
+BRIGHT_MAX = 95        # luminosita' pct massima (scena chiarissima)
+BRIGHT_GAMMA = 1.5     # gamma: il buio percepito scende piu' veloce del valore
+PUB_BRI_DELTA = 20.0   # variazione minima di bri (%) per il cambio di SOLA bri
+BRIGHT_HOLD = 10.0     # attesa minima (s) tra due cambi di sola luminosita'
+# Edge masking: il peso dell'analisi e' spostato dal centro verso i bordi del
+# frame (effetto ambilight: le luci estendono la periferia dello schermo). Il
+# centro mantiene EDGE_FLOOR di peso, la periferia ha il peso pieno quando c'e'
+# colore uniforme, ma eventi iper-saturi al centro non svaniscono del tutto.
+EDGE_WEIGHT = True    # True attiva la vignette spaziale sui bin hue
+EDGE_FLOOR = 0.30     # peso al centro (0.30) vs bordi (1.0)
+EDGE_POWER = 2.0      # curva quadratica: centro piu' isolato (1.0 = lineare)
+# --- MODALITA' IMMERSIVA (--immersive) ---
+# La strip LED e' la bias light (colore dominante pieno); la luce camera
+# (soffitto) fa da luce ambiente: stesso hue ma intensita' fortemente
+# attenuata (stato dell'arte: le accent lights non devono staccare dal
+# contenuto ma nemmeno illuminare la stanza a pieno regime)
+CAM_SAT_SCALE = 0.7   # saturazione del soffitto = sat della scena * 0.7
+CAM_BRI_SCALE = 0.25  # luminosita' del soffitto = bri della scena * 0.25
 # Stabilita' del colore: la tinta e' la media gaussiana pesata dei bin hue
 # attorno al bin con piu' energia (sigma ~40°), quindi aree piccole ma sature
 # (es. mani in movimento) non fanno cambiare colore alle luci.
@@ -54,7 +82,9 @@ loop = GLib.MainLoop()
 s = {"session": None, "node": None, "fd": None, "restore_token": None,
      "cur_hsv": None, "last_pub": None, "last_pub_time": 0.0,
      "hhist": collections.deque(maxlen=4),
-     "pipeline": None, "last_frame": None, "frame_seq": 0, "running": True}
+     "pipeline": None, "last_frame": None, "frame_seq": 0, "running": True,
+     "edge_mask": None, "edge_mask_shape": (0, 0),
+     "last_bri_time": 0.0}
 lock = threading.Lock()
 
 
@@ -79,20 +109,6 @@ def conf_load():
                     k, _, v = row.partition("=")
                     os.environ.setdefault(k.strip(), v.strip().strip('"'))
     return os.environ.get("MQTT_USER", "lorenzo"), os.environ.get("MQTT_PASS", "")
-
-
-def gamemode_active():
-    """True se esiste almeno una sessione GameMode attiva (gamemoderun)."""
-    try:
-        out = subprocess.run(
-            ["gdbus", "call", "--session",
-             "--dest", "com.feralinteractive.GameMode",
-             "--object-path", "/com/feralinteractive/GameMode",
-             "--method", "com.feralinteractive.GameMode.QueryStatus", "0"],
-            capture_output=True, text=True, timeout=5)
-        return "(" in out.stdout and not out.stdout.startswith("(0")
-    except Exception:
-        return False
 
 
 def mqtt_pub(topic, msg):
@@ -265,9 +281,6 @@ def open_pipewire():
 
 def loop_ready():
     log("loop avviato")
-    if not gamemode_active():
-        log("nessuna sessione gamemoderun attiva: esco senza toccare le luci")
-        sys.exit(0)
     mqtt_pub("fedora/light/start", "1")
     desc = (f"pipewiresrc fd={s['fd']} path={s['node']} "
             f"! videoconvert ! videoscale ! video/x-raw,width=240,format=RGB "
@@ -338,11 +351,15 @@ def dominant_hsv(rgb):
     """Colore dominante: hue calcolato come media gaussiana pesata dei bin
     attorno al bin con piu' energia (sigma = 2 bin, ~40°).
 
-    I bin lontani dal vincente contribuiscono quasi zero: le aree piccole ma
+I bin lontani dal vincente contribuiscono quasi zero: le aree piccole ma
     sature (mani, oggetti in movimento) non spostano il colore delle luci e
     non ci sono fluttuazioni tra colori quasi opposti. Sat/lum dalla media
     dei pixel del bin vincente (colore vivo). Ritorna (h, s, v) in [0,1),
-    None se la scena e' quasi senza colore."""
+    None se la scena e' quasi senza colore.
+
+    Il gate "scena senza colore" usa l'energia NON mascherata (stessa soglia
+    del comportamento originale); la maschera EDGE_WEIGHT pesa solo la scelta
+    del bin vincente, spostando il colore verso i bordi dello schermo."""
     f = rgb.astype(np.float64) / 255.0
     r, g, b = f[..., 0], f[..., 1], f[..., 2]
     mx = np.maximum(np.maximum(r, g), b)
@@ -369,6 +386,16 @@ def dominant_hsv(rgb):
         # scena quasi senza colore: nessun publish, si mantiene l'ultimo
         # colore gia' applicato alle luci
         return None
+    if EDGE_WEIGHT:
+        h_frame, w_frame = r.shape
+        if s["edge_mask_shape"] != (h_frame, w_frame):
+            yy, xx = np.indices((h_frame, w_frame))
+            dy = np.abs(yy - h_frame / 2.0) / (h_frame / 2.0)
+            dx = np.abs(xx - w_frame / 2.0) / (w_frame / 2.0)
+            dist = np.maximum(dx, dy)
+            s["edge_mask"] = EDGE_FLOOR + (1.0 - EDGE_FLOOR) * (dist ** EDGE_POWER)
+            s["edge_mask_shape"] = (h_frame, w_frame)
+        energy = energy * s["edge_mask"]
     nbins = 18
     bi = (hue * nbins).astype(np.int64).ravel() % nbins
     bsum = np.bincount(bi, weights=energy.ravel(), minlength=nbins)
@@ -386,8 +413,9 @@ def dominant_hsv(rgb):
     r_m = float(r[mbin].mean())
     g_m = float(g[mbin].mean())
     b_m = float(b[mbin].mean())
-    _, ts, tv = colorsys_hsv(r_m, g_m, b_m)
-    return th, ts, tv, f"h{int(th * 360)}"
+    _, ts, _ = colorsys_hsv(r_m, g_m, b_m)
+    scene_v = float(val.mean())
+    return th, ts, scene_v, f"h{int(th * 360)}"
 
 
 def colorsys_hsv(r, g, b):
@@ -402,8 +430,17 @@ def publish_color(frame):
     if res is None:
         log("scena senza colore: nessun publish (ultimo colore mantenuto)")
         return
-    th, ts, tv, hue_label = res
+    th, ts, scene_v, hue_label = res
     ts = max(ts, 0.45)
+    # Luminosita' dinamica: la bri segue la luce TOTALE del monitor (media di
+    # val sull'intero frame) con curva gamma; floor BRIGHT_MIN per non spegnere
+    # la stanza, tetto BRIGHT_MAX. Pendenza conservativa: un comando di SOLA bri
+    # puo' arrivare solo ogni BRIGHT_HOLD secondi e solo se il salto supera
+    # PUB_BRI_DELTA (%) - il controller Tuya regge il fade su hue/sat ma si
+    # incastra con troppi messaggi di sola luminosita'.
+    gamma_v = scene_v ** BRIGHT_GAMMA
+    b_pct = int(BRIGHT_MIN + (BRIGHT_MAX - BRIGHT_MIN) * gamma_v)
+    b_pct = max(BRIGHT_MIN, min(BRIGHT_MAX, b_pct))
     s["hhist"].append(th)
     # Cooldown: tra un publish e il successivo passa almeno COOLDOWN secondi,
     # cosi' il fade hardware arriva a destinazione prima del prossimo cambio.
@@ -425,21 +462,34 @@ def publish_color(frame):
         if spread > LOCK_DEG / 360.0:
             log(f"colore instabile (spread {spread * 360:.0f}°): nessun publish")
             return
-    # Publish solo quando la scena si e' allontanata oltre la soglia.
+    # Gate di pubblicazione: cambio colore (deadband hue/sat) oppure cambio di
+    # SOLA luminosita' (deadband PUB_BRI_DELTA + holdoff BRIGHT_HOLD). Un cambio
+    # colore valido fa 'cavalcare' la bri nello stesso publish senza attese.
     lp = s["last_pub"]
     if lp is not None:
         dh = abs((th * 360 - lp[0] * 360 + 180) % 360 - 180)
-        if dh < PUB_HUE_DEG and abs(ts - lp[1]) < PUB_SAT_DELTA:
-            log(f"colore invariato ({hue_label}): nessun publish")
+        ds = abs(ts - lp[1])
+        db = abs(b_pct - lp[2])
+        color_changed = (dh >= PUB_HUE_DEG) or (ds >= PUB_SAT_DELTA)
+        bri_changed = (db >= PUB_BRI_DELTA) and \
+            (now - s["last_bri_time"] >= BRIGHT_HOLD)
+        if not (color_changed or bri_changed):
+            log(f"invariato ({hue_label} bri:{b_pct}%): nessun publish")
             return
-    s["last_pub"] = (th, ts, tv)
+    s["last_pub"] = (th, ts, b_pct)
     s["last_pub_time"] = now
+    s["last_bri_time"] = now
     h_deg = round(th * 360, 1)
     s_pct = round(ts * 100, 1)
-    b_pct = BRIGHT_FIXED
     payload = f"{h_deg},{s_pct},{b_pct}"
     mqtt_pub("fedora/light/led/color", payload)
     log(f"pubblicato: {payload} [{hue_label}]")
+    if s.get("immersive"):
+        cam_s = round(ts * CAM_SAT_SCALE * 100, 1)
+        cam_b = round(b_pct * CAM_BRI_SCALE, 1)
+        cam_payload = f"{h_deg},{cam_s},{cam_b}"
+        mqtt_pub("fedora/light/cam/color", cam_payload)
+        log(f"camera (immersive): {cam_payload}")
 
 
 # ---------- fine ----------
@@ -463,10 +513,20 @@ def shutdown(*_):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] != "daemon":
-        print("uso: screenshot_portal.py daemon", file=sys.stderr)
+        print("uso: screenshot_portal.py daemon [--immersive]", file=sys.stderr)
         sys.exit(1)
+    s["immersive"] = "--immersive" in sys.argv[2:]
+    PID_FILE = "/tmp/ambilight_daemon.pid"
+    if os.path.isfile(PID_FILE):
+        try:
+            old = int(open(PID_FILE).read().strip())
+            if old != os.getpid() and os.path.exists(f"/proc/{old}"):
+                log(f"un altro daemon ambilight e' gia' attivo (pid {old}): esco")
+                sys.exit(0)
+        except (ValueError, OSError):
+            pass
     try:
-        with open("/tmp/ambilight_daemon.pid", "w") as f:
+        with open(PID_FILE, "w") as f:
             f.write(str(os.getpid()))
     except OSError:
         pass

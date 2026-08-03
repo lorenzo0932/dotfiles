@@ -20,18 +20,19 @@ Utilities to dump and reload custom desktop keybindings.
 ### 4. [GameMode](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/)
 Custom game-related scripts.
 *   [openSteamAtConnection.py](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/openSteamAtConnection.py): Python utility to trigger Steam startup upon detecting a connection.
-*   [screenshot_portal.py](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/screenshot_portal.py): Ambilight daemon (XDG ScreenCast portal + GStreamer, avviato da gamemode via `ambilight.sh`). Pubblica il colore dominante dello schermo su MQTT (`fedora/light/led/color`); HA applica hue/sat/bri alla strip LED. La luce camera è esclusa dal loop.
-*   [ambilight.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/ambilight.sh): Hook gamemode che avvia/ferma `ambilight.service` (systemd user).
+*   [screenshot_portal.py](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/GameMode/screenshot_portal.py): Ambilight daemon (XDG ScreenCast portal + GStreamer). Trigger: estensione GNOME **fullscreen-command** (quando una finestra va fullscreen esegue `systemctl --user start ambilight.service` — o `ambilight-immersive.service`); si avvia anche manualmente. Pubblica il colore dominante su MQTT (`fedora/light/led/color`); HA applica hue/sat/bri alla strip LED. Con `daemon --immersive` pubblica lo stesso colore attenuato (sat ×0.7, bri ×0.25) anche su `fedora/light/cam/color`: la luce camera (soffitto) fa da luce ambiente insieme alla strip.
 
-#### Ambilight: design rationale (v7.6)
+#### Ambilight: design rationale (v8.0)
 Obiettivo: transizioni "cinematiche" — pochi cambi di colore, ognuno un fade lungo e fluido. Le luci hanno il fade hardware (strip LED: dp localtuya 26=150, ~35°/s; luce camera: fade nativo), quindi il daemon **non** deve mandare step intermedi (persi comunque, limite 500ms di polling localtuya).
 
 Catena di filtri nel daemon (in ordine, costanti in cima a `screenshot_portal.py`):
 1. **Estrazione**: istogramma HSV a 18 bin pesato per energia (sat×val); il colore è la **media gaussiana dei bin attorno al bin vincente** (σ=2 bin ≈ 40°): aree piccole ma sature (mani, oggetti in movimento) non spostano il colore. Scena quasi senza colore (<1.2% di energia) → nessun publish.
-2. **Color lock** (`LOCK_DEG=25`, finestra 4 tick ≈ 2.8s): si pubblica solo se gli ultimi 4 hue rilevati stanno entro ±25° — i flash brevi (<2s, esplosioni, lampi) non vengono mai pubblicati (replica il "lock" di Philips Hue Sync).
-3. **Cooldown** (`COOLDOWN=6s`): al massimo 1 publish ogni 6s, così il fade hardware arriva SEMPRE a destinazione prima del prossimo cambio (mai fade interrotti → niente scatti).
-4. **Deadband**: publish solo se il target dista ≥30° di hue o ≥0.2 di saturazione dall'ultimo colore inviato. Luminosità **fissa** (`BRIGHT_FIXED=80`): il colore segue la scena, la bri no (evita il tremolio da variazioni continue di luminanza).
-5. **Timing**: `INTERVAL=0.7s` tra le analisi (misurato: a 500ms i comandi localtuya si perdono, a 700ms 100% affidabile).
+2. **Edge masking** (`EDGE_WEIGHT`, `EDGE_FLOOR=0.30`, `EDGE_POWER=2.0`): peso spostato dal centro ai bordi (effetto ambilight: le luci estendono la periferia dello schermo). Il gate "nessun colore" usa l'energia non mascherata.
+3. **Color lock** (`LOCK_DEG=25`, finestra 4 tick ≈ 2.8s): si pubblica solo se gli ultimi 4 hue rilevati stanno entro ±25° — i flash brevi (<2s, esplosioni, lampi) non vengono mai pubblicati (replica il "lock" di Philips Hue Sync).
+4. **Cooldown** (`COOLDOWN=1.0s`): al massimo 1 publish al secondo, così il fade hardware arriva SEMPRE a destinazione prima del prossimo cambio (mai fade interrotti → niente scatti).
+5. **Deadband + bri dinamica**: publish solo se il target dista ≥30° di hue o ≥0.2 di saturazione dall'ultimo colore inviato. La bri segue la luminosità TOTALE del monitor (`scene_v`, media Value non mascherata) con curva gamma (`BRIGHT_MIN=25`, `BRIGHT_MAX=95`, `BRIGHT_GAMMA=1.5`) ma cambia solo con deadband larga (`PUB_BRI_DELTA=20%`) e holdoff (`BRIGHT_HOLD=10s`): il controller Tuya si incastra con troppi comandi di sola bri. Un cambio colore valido fa "cavalcare" la bri nello stesso publish.
+6. **Timing**: `INTERVAL=0.7s` tra le analisi (misurato: a 500ms i comandi localtuya si perdono, a 700ms 100% affidabile).
+7. **Immersive** (`--immersive`, unit `ambilight-immersive.service`): stesso hue sulla luce camera ma sat ×`CAM_SAT_SCALE` (0.7) e bri ×`CAM_BRI_SCALE` (0.25) — il soffitto è luce ambiente, non bias light (stato dell'arte Hue Sync). Un solo daemon per volta: guard sul pidfile `/tmp/ambilight_daemon.pid` (doppio start = no-op con messaggio nel log).
 
 Da NON rifare senza motivo: misurare di nuovo i limiti localtuya, ridurre cooldown/lock (si torna ai fade interrotti), o inseguire il colore a ogni tick (flip + scatti). Limite noto accettato: il percorso del fade lo decide il firmware della strip (interpolazione RGB, non percettiva).
 
