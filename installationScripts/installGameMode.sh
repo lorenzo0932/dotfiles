@@ -1,15 +1,13 @@
 #! /bin/bash
-# Installa la configurazione di Feral GameMode (specchiata da ~/.config/gamemode.ini
-# in configs/gamemode.ini del repo, per riferimento/restore).
-# Usa -u: non sovrascrive mai file live piu' recenti.
-# Richiede: GameMode installato (gamemode, gamemoded) e gli hook ambilight
-# in myScript/GameMode/ambilight.sh (installati da installScripts.sh).
+# Niente piu' hook gamemode per l'ambilight: il trigger e' l'estensione GNOME
+# fullscreen-command (start/stop dei servizi ambilight.service /
+# ambilight-immersive.service). Questo installer rimuove la vecchia
+# configurazione gamemode.ini (che conteneva solo i [custom] start/end) per
+# migrare installazioni precedenti.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-if [ ! -d "$HOME/.config" ]; then
-    mkdir -p "$HOME/.config"
+if [ -f "$HOME/.config/gamemode.ini" ]; then
+    rm -f "$HOME/.config/gamemode.ini"
+    echo "Rimossa la vecchia ~/.config/gamemode.ini (hook ambilight non piu' usati)."
+else
+    echo "Nessuna ~/.config/gamemode.ini da rimuovere."
 fi
-
-cp -u "$SCRIPT_DIR/../configs/gamemode.ini" "$HOME/.config/gamemode.ini"
-echo "gamemode.ini installato in $HOME/.config/gamemode.ini"
