@@ -27,32 +27,47 @@ gi.require_version("Gst", "1.0")
 gi.require_version("GstApp", "1.0")
 from gi.repository import Gio, GLib, Gst, GstApp
 
-INTERVAL = 0.7        # secondi tra un'analisi colore e l'altra
+INTERVAL = 0.2        # secondi tra un'analisi colore e l'altra
 # Transizioni "cinematiche" a pochi step: il daemon pubblica il target solo
 # quando la scena si e' allontanata abbastanza dall'ultimo colore inviato e
 # solo ogni COOLDOWN secondi; sono i device a fare le transizioni fluide
 # (fade nativo della luce camera, fade hardware della strip LED regolato da
-# dp26=150, ~35 gradi/s). Cooldown >= durata fade: ogni cambio e' un passaggio
-# lungo e continuo che arriva a destinazione, senza interruzioni a meta'.
+# dp26=150, ~700°/s misurato: 180° in 200-300ms). Cooldown > durata fade di
+# un passo (30° a ~700°/s = ~40ms): ogni cambio e' un passaggio lungo e
+# continuo che arriva a destinazione, senza interruzioni a meta'. Rate e
+# cooldown al limite del canale localtuya: 20/20 publish senza perdite fino
+# a 200ms, perdite a 100ms; INTERVAL 0.2s = 5Hz e' il massimo sicuro.
 PUB_HUE_DEG = 30.0    # soglia minima di spostamento hue per pubblicare
 PUB_SAT_DELTA = 0.2   # soglia minima di variazione saturazione
-COOLDOWN = 1.0        # intervallo minimo (s) tra due publish
-LOCK_DEG = 25.0       # color lock: i target hue degli ultimi ~4 tick devono
-                      # stare dentro questa banda, altrimenti la scena e'
-                      # instabile (flash brevi) e non si pubblica nulla
+COOLDOWN = 0.3        # intervallo minimo (s) tra due publish
+LOCK_DEG = 25.0       # color lock: i tick di conferma richiesti devono stare
+                      # dentro questa banda. Il numero di tick richiesti e'
+                      # adattivo: 1 per salti >120°, 2 per >60°, 4 per il resto
+                      # (a INTERVAL 0.2: 200/400/800ms di reazione)
+DOMINANCE = 1.5       # soglia di dominanza: se un cluster hue lontano (>4 bin,
+                      # ~80°) ha energia >= vincente/DOMINANCE la scena e'
+                      # bimodale ambigua (es. personaggio caldo + sfondo
+                      # freddo, tipico anime): il bin vincente e' bistabile e
+                      # flippa tra frame. Il colore resta l'ultimo applicato,
+                      # ma la bri continua a seguire la scena. 1.0 = disattiva.
+PERSIST_DEG = 90.0    # salti hue > PERSIST_DEG richiedono conferma di
+                      # persistenza direzionale prima del publish
+PERSIST_TICKS = 2     # tick consecutivi (INTERVAL 0.2 = 400ms) con il colore
+                      # lontano dall'ultimo pubblicato per accettare il salto:
+                      # i battiti A-B-A (alternanza tra poli di energia quasi
+                      # uguale) non accumulano mai 2 tick, i cambi scena reali
+                      # (energia 2.5-3.7x) passano in ~400ms
 # --- LUMINOSITA' DINAMICA ---
 # La bri segue la luce TOTALE del monitor (media del canale Value su tutto il
 # frame, NON mascherata): stanza che scende nelle scene scure. Curva gamma per
-# non far "gridare" le scene medie. Vincolo hardware: il controller Tuya fa un
-# bel fade su hue/sat ma si incastra se riceve troppi comandi di SOLA bri; quindi
-# la bri cambia solo con deadband larga (PUB_BRI_DELTA) e holdoff dedicato
-# (BRIGHT_HOLD). Un cambio colore valido fa "cavalcare" la bri nello stesso
-# publish (gratis per il controller)
+# non far "gridare" le scene medie. La bri cambia con deadband PUB_BRI_DELTA e
+# holdoff BRIGHT_HOLD; un cambio colore valido fa "cavalcare" la bri nello
+# stesso publish (gratis per il controller).
 BRIGHT_MIN = 25        # luminosita' pct minima (scena scurissima, stanza mai spenta)
 BRIGHT_MAX = 95        # luminosita' pct massima (scena chiarissima)
 BRIGHT_GAMMA = 1.5     # gamma: il buio percepito scende piu' veloce del valore
-PUB_BRI_DELTA = 20.0   # variazione minima di bri (%) per il cambio di SOLA bri
-BRIGHT_HOLD = 10.0     # attesa minima (s) tra due cambi di sola luminosita'
+PUB_BRI_DELTA = 12.0  # variazione minima di bri (%) per il cambio di SOLA bri
+BRIGHT_HOLD = 3.0     # attesa minima (s) tra due cambi di sola luminosita'
 # Edge masking: il peso dell'analisi e' spostato dal centro verso i bordi del
 # frame (effetto ambilight: le luci estendono la periferia dello schermo). Il
 # centro mantiene EDGE_FLOOR di peso, la periferia ha il peso pieno quando c'e'
@@ -64,7 +79,9 @@ EDGE_POWER = 2.0      # curva quadratica: centro piu' isolato (1.0 = lineare)
 # La strip LED e' la bias light (colore dominante pieno); la luce camera
 # (soffitto) fa da luce ambiente: stesso hue ma intensita' fortemente
 # attenuata (stato dell'arte: le accent lights non devono staccare dal
-# contenuto ma nemmeno illuminare la stanza a pieno regime)
+# contenuto ma nemmeno illuminare la stanza a pieno regime). La camera
+# segue 1:1 con lo stesso rate: conferma DP a ~17ms e fade fluido fino a
+# 200ms (piu' veloce della strip), quindi nessuna decimazione necessaria.
 CAM_SAT_SCALE = 0.7   # saturazione del soffitto = sat della scena * 0.7
 CAM_BRI_SCALE = 0.25  # luminosita' del soffitto = bri della scena * 0.25
 # Stabilita' del colore: la tinta e' la media gaussiana pesata dei bin hue
@@ -82,6 +99,7 @@ loop = GLib.MainLoop()
 s = {"session": None, "node": None, "fd": None, "restore_token": None,
      "cur_hsv": None, "last_pub": None, "last_pub_time": 0.0,
      "hhist": collections.deque(maxlen=4),
+     "dir_hold": 0,
      "pipeline": None, "last_frame": None, "frame_seq": 0, "running": True,
      "edge_mask": None, "edge_mask_shape": (0, 0),
      "last_bri_time": 0.0}
@@ -382,6 +400,7 @@ I bin lontani dal vincente contribuiscono quasi zero: le aree piccole ma
                           np.where(mx[m] == g[m], hg[m], hb[m])) / 6.0
     val = mx
     energy = sat * val
+    scene_v = float(val.mean())
     if energy.sum() < 0.012 * r.size:
         # scena quasi senza colore: nessun publish, si mantiene l'ultimo
         # colore gia' applicato alle luci
@@ -400,6 +419,18 @@ I bin lontani dal vincente contribuiscono quasi zero: le aree piccole ma
     bi = (hue * nbins).astype(np.int64).ravel() % nbins
     bsum = np.bincount(bi, weights=energy.ravel(), minlength=nbins)
     best = int(np.argmax(bsum))
+    # Soglia di dominanza: se il cluster hue lontano (>4 bin, ~80°) con piu'
+    # energia rivaleggia col vincente, la scena e' bimodale ambigua (due poli
+    # di energia paragonabile, es. soggetto caldo su sfondo freddo). In questo
+    # caso il bin vincente e' bistabile e flipperebbe tra i due poli a ogni
+    # frame: il colore resta l'ultimo applicato alle luci (il publish del
+    # colore e' soppresso), ma la bri continua a seguire la scena (sentinella
+    # (None, scene_v)). Il gate usa l'energia mascherata.
+    if DOMINANCE > 1.0:
+        ang = np.abs((np.arange(nbins) - best + nbins // 2) % nbins - nbins // 2)
+        rival = bsum[ang >= 4]
+        if rival.size and rival.max() > bsum[best] / DOMINANCE:
+            return None, scene_v
     # peso gaussiano circolare attorno al bin vincente
     dist = np.abs((np.arange(nbins) - best + nbins // 2) % nbins - nbins // 2)
     w = np.exp(-(dist ** 2) / (2 * 2.0 ** 2))
@@ -414,7 +445,6 @@ I bin lontani dal vincente contribuiscono quasi zero: le aree piccole ma
     g_m = float(g[mbin].mean())
     b_m = float(b[mbin].mean())
     _, ts, _ = colorsys_hsv(r_m, g_m, b_m)
-    scene_v = float(val.mean())
     return th, ts, scene_v, f"h{int(th * 360)}"
 
 
@@ -425,60 +455,7 @@ def colorsys_hsv(r, g, b):
                                max(0.0, min(1.0, b)))
 
 
-def publish_color(frame):
-    res = dominant_hsv(frame)
-    if res is None:
-        log("scena senza colore: nessun publish (ultimo colore mantenuto)")
-        return
-    th, ts, scene_v, hue_label = res
-    ts = max(ts, 0.45)
-    # Luminosita' dinamica: la bri segue la luce TOTALE del monitor (media di
-    # val sull'intero frame) con curva gamma; floor BRIGHT_MIN per non spegnere
-    # la stanza, tetto BRIGHT_MAX. Pendenza conservativa: un comando di SOLA bri
-    # puo' arrivare solo ogni BRIGHT_HOLD secondi e solo se il salto supera
-    # PUB_BRI_DELTA (%) - il controller Tuya regge il fade su hue/sat ma si
-    # incastra con troppi messaggi di sola luminosita'.
-    gamma_v = scene_v ** BRIGHT_GAMMA
-    b_pct = int(BRIGHT_MIN + (BRIGHT_MAX - BRIGHT_MIN) * gamma_v)
-    b_pct = max(BRIGHT_MIN, min(BRIGHT_MAX, b_pct))
-    s["hhist"].append(th)
-    # Cooldown: tra un publish e il successivo passa almeno COOLDOWN secondi,
-    # cosi' il fade hardware arriva a destinazione prima del prossimo cambio.
-    now = time.time()
-    if now - s["last_pub_time"] < COOLDOWN:
-        log(f"cooldown: prossimo publish tra {COOLDOWN - (now - s['last_pub_time']):.1f}s")
-        return
-    # Color lock: il colore viene applicato solo se la scena e' stabile
-    # (gli ultimi ~4 tick entro LOCK_DEG l'uno dall'altro). Un flash breve
-    # non fa cambiare le luci: il nuovo colore deve persistere ~3s.
-    hh = list(s["hhist"])
-    if len(hh) >= 2:
-        spread = 0.0
-        for i in range(len(hh)):
-            for j in range(i + 1, len(hh)):
-                d = abs((hh[i] - hh[j] + 0.5) % 1.0 - 0.5)
-                if d > spread:
-                    spread = d
-        if spread > LOCK_DEG / 360.0:
-            log(f"colore instabile (spread {spread * 360:.0f}°): nessun publish")
-            return
-    # Gate di pubblicazione: cambio colore (deadband hue/sat) oppure cambio di
-    # SOLA luminosita' (deadband PUB_BRI_DELTA + holdoff BRIGHT_HOLD). Un cambio
-    # colore valido fa 'cavalcare' la bri nello stesso publish senza attese.
-    lp = s["last_pub"]
-    if lp is not None:
-        dh = abs((th * 360 - lp[0] * 360 + 180) % 360 - 180)
-        ds = abs(ts - lp[1])
-        db = abs(b_pct - lp[2])
-        color_changed = (dh >= PUB_HUE_DEG) or (ds >= PUB_SAT_DELTA)
-        bri_changed = (db >= PUB_BRI_DELTA) and \
-            (now - s["last_bri_time"] >= BRIGHT_HOLD)
-        if not (color_changed or bri_changed):
-            log(f"invariato ({hue_label} bri:{b_pct}%): nessun publish")
-            return
-    s["last_pub"] = (th, ts, b_pct)
-    s["last_pub_time"] = now
-    s["last_bri_time"] = now
+def send_pub(th, ts, b_pct, hue_label):
     h_deg = round(th * 360, 1)
     s_pct = round(ts * 100, 1)
     payload = f"{h_deg},{s_pct},{b_pct}"
@@ -490,6 +467,107 @@ def publish_color(frame):
         cam_payload = f"{h_deg},{cam_s},{cam_b}"
         mqtt_pub("fedora/light/cam/color", cam_payload)
         log(f"camera (immersive): {cam_payload}")
+
+
+def publish_color(frame):
+    res = dominant_hsv(frame)
+    if res is None:
+        log("scena senza colore: nessun publish (ultimo colore mantenuto)")
+        return
+    now = time.time()
+    lp = s["last_pub"]
+    if res[0] is None:
+        # Scena bimodale ambigua: il colore e' bistabile, si tiene l'ultimo
+        # applicato, ma la bri continua a seguire la scena (deadband +
+        # holdoff come per i cambi di sola luminosita').
+        _, scene_v = res
+        gamma_v = scene_v ** BRIGHT_GAMMA
+        b_pct = int(BRIGHT_MIN + (BRIGHT_MAX - BRIGHT_MIN) * gamma_v)
+        b_pct = max(BRIGHT_MIN, min(BRIGHT_MAX, b_pct))
+        s["dir_hold"] = 0
+        if lp is None:
+            return
+        db = abs(b_pct - lp[2])
+        if db >= PUB_BRI_DELTA and now - s["last_bri_time"] >= BRIGHT_HOLD \
+                and now - s["last_pub_time"] >= COOLDOWN:
+            s["last_pub"] = (lp[0], lp[1], b_pct)
+            s["last_pub_time"] = now
+            s["last_bri_time"] = now
+            send_pub(lp[0], lp[1], b_pct, f"bri su scena ambigua ({db:.0f}%)")
+        else:
+            log(f"scena ambigua: colore fermo, bri invariata ({b_pct}%)")
+        return
+    th, ts, scene_v, hue_label = res
+    ts = max(ts, 0.45)
+    # Luminosita' dinamica: la bri segue la luce TOTALE del monitor (media di
+    # val sull'intero frame) con curva gamma; floor BRIGHT_MIN per non spegnere
+    # la stanza, tetto BRIGHT_MAX. Deadband PUB_BRI_DELTA + holdoff BRIGHT_HOLD
+    # per non far "respirare" la luce su variazioni rapide della scena.
+    gamma_v = scene_v ** BRIGHT_GAMMA
+    b_pct = int(BRIGHT_MIN + (BRIGHT_MAX - BRIGHT_MIN) * gamma_v)
+    b_pct = max(BRIGHT_MIN, min(BRIGHT_MAX, b_pct))
+    s["hhist"].append(th)
+    if lp is not None:
+        dh = abs((th * 360 - lp[0] * 360 + 180) % 360 - 180)
+        # Persistenza direzionale: un salto grande (dh > PERSIST_DEG) deve
+        # restare lontano dall'ultimo colore pubblicato per PERSIST_TICKS tick
+        # consecutivi (a INTERVAL 0.2: 400ms) prima di essere accettato. Le
+        # scene bimodali fanno battere il colore tra due poli quasi opposti
+        # (A-B-A): il contatore si resetta a ogni ritorno entro PERSIST_DEG,
+        # quindi i battiti non superano mai la soglia. Un vero cambio scena e'
+        # unidirezionale e arriva alla conferma in ~400ms (2.5-3.7x di energia
+        # a favore, la soglia DOMINANCE non lo blocca).
+        if dh > PERSIST_DEG:
+            s["dir_hold"] += 1
+            if s["dir_hold"] < PERSIST_TICKS:
+                log(f"salto {dh:.0f}°: conferma {s['dir_hold']}/{PERSIST_TICKS}")
+                return
+        else:
+            s["dir_hold"] = 0
+    else:
+        dh = 0.0
+    # Cooldown: tra un publish e il successivo passa almeno COOLDOWN secondi,
+    # cosi' il fade hardware arriva a destinazione prima del prossimo cambio.
+    if now - s["last_pub_time"] < COOLDOWN:
+        log(f"cooldown: prossimo publish tra {COOLDOWN - (now - s['last_pub_time']):.1f}s")
+        return
+    # Color lock adattivo: la stabilita' richiesta dipende da quanto il colore
+    # attuale e' lontano dall'ultimo pubblicato. Cambi spettacolari (>120°)
+    # richiedono solo 1 tick di conferma (200ms), cambi medi 2 tick, cambi
+    # piccoli 4 tick: i flash brevi restano bloccati, i salti di scena grandi
+    # arrivano subito. Un flash breve non fa cambiare le luci.
+    if lp is not None:
+        need = 1 if dh >= 120.0 else (2 if dh >= 60.0 else 4)
+    else:
+        need = 4
+    hh = list(s["hhist"])[-need:]
+    if len(hh) >= 2:
+        spread = 0.0
+        for i in range(len(hh)):
+            for j in range(i + 1, len(hh)):
+                d = abs((hh[i] - hh[j] + 0.5) % 1.0 - 0.5)
+                if d > spread:
+                    spread = d
+        if spread > LOCK_DEG / 360.0:
+            log(f"colore instabile (spread {spread * 360:.0f}°, need {need}): nessun publish")
+            return
+    # Gate di pubblicazione: cambio colore (deadband hue/sat) oppure cambio di
+    # SOLA luminosita' (deadband PUB_BRI_DELTA + holdoff BRIGHT_HOLD). Un cambio
+    # colore valido fa 'cavalcare' la bri nello stesso publish senza attese.
+    if lp is not None:
+        ds = abs(ts - lp[1])
+        db = abs(b_pct - lp[2])
+        color_changed = (dh >= PUB_HUE_DEG) or (ds >= PUB_SAT_DELTA)
+        bri_changed = (db >= PUB_BRI_DELTA) and \
+            (now - s["last_bri_time"] >= BRIGHT_HOLD)
+        if not (color_changed or bri_changed):
+            log(f"invariato ({hue_label} bri:{b_pct}%): nessun publish")
+            return
+    s["last_pub"] = (th, ts, b_pct)
+    s["last_pub_time"] = now
+    s["last_bri_time"] = now
+    s["dir_hold"] = 0
+    send_pub(th, ts, b_pct, hue_label)
 
 
 # ---------- fine ----------
