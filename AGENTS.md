@@ -12,7 +12,7 @@ Repo personale di dotfiles/script: **backup periodico** di una macchina Linux (F
 - `protonvpn_reconnect.service` è gestita dall'app ProtonVPN ed è esclusa dal sync (`exclude.txt`): resta solo in live.
 - `exclude.txt` (in `myScript/rSync/`) esclude dal sync: `*.log`, `__pycache__`, `.mypy_cache`, `dist`, `build`, `gemini.env`, `AniDownloader.*`, ecc. È sia in live che nel repo: modifica la copia live.
 - `~/.config/autostart/` NON è sincronizzato (scelta dell'utente): gli `.desktop` di avvio automatico vivono solo in live.
-- Le estensioni GNOME Shell NON vengono copiate: `rsync_sync.service` esegue prima della sync `ExportGnomeExtensions.sh` (ExecStartPre) che salva solo la lista UUID attive + impostazioni dconf in `myScript/ExportGnomeExtensions/`. Il ripristino (manuale) scarica le estensioni da extensions.gnome.org con `RestoreGnomeExtensions.sh`.
+- Le estensioni GNOME Shell NON vengono copiate tranne l'estensione custom `fullscreen-command@lorenzo0932`: `rsync_sync.service` esegue prima della sync `ExportGnomeExtensions.sh` (ExecStartPre) che salva la lista UUID attive + impostazioni dconf in `myScript/ExportGnomeExtensions/` e la copia dell'estensione custom (files + schemas) in `myScript/ExportGnomeExtensions/fullscreen-command@lorenzo0932/`. Il ripristino (manuale) scarica le estensioni da extensions.gnome.org con `RestoreGnomeExtensions.sh`, mentre la custom viene ripristinata dalla copia locale.
 
 ## Commit
 

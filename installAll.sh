@@ -7,6 +7,7 @@ cd "$(dirname "$0")/installationScripts"
 chmod +x *.sh
 
 ./installScripts.sh
+./installDeps.sh
 ./installServices.sh
 ./installMPV.sh
 ./installNautilusScripts.sh

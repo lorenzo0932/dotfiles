@@ -2,6 +2,8 @@
 # Ripristina le estensioni GNOME Shell partendo dall'export di ExportGnomeExtensions.sh:
 # scarica da extensions.gnome.org (EGO) e installa nella cartella corretta
 # (~/.local/share/gnome-shell/extensions/), poi ripristina l'elenco attivo e le impostazioni.
+# L'estensione custom fullscreen-command@lorenzo0932 non e' su EGO e viene
+# ripristinata dalla copia locale in $SOURCE.
 # Uso manuale, richiede conferma.
 
 set -uo pipefail
@@ -39,6 +41,17 @@ for uuid in "${UUID_LIST[@]}"; do
     [ -z "$uuid" ] && continue
     echo
     echo "--- $uuid"
+
+    # Estensione custom locale (es. fullscreen-command@lorenzo0932): non e'
+    # su EGO, la copio direttamente dalla copia esportata (files + schemas).
+    if [ -d "$SOURCE/$uuid" ]; then
+        mkdir -p "$EXTENSIONS_DIR"
+        cp -ru "$SOURCE/$uuid" "$EXTENSIONS_DIR/"
+        gnome-extensions enable "$uuid" 2>/dev/null || true
+        echo "  Ripristinata da copia locale ($SOURCE/$uuid)."
+        installed=$((installed + 1))
+        continue
+    fi
 
     info=$(curl -s --max-time 15 "https://extensions.gnome.org/extension-info/?uuid=$uuid&shell_version=$SHELL_VERSION")
     download_url=$(echo "$info" | grep -oP '"download_url":\s*"\K[^"]+' | head -1)

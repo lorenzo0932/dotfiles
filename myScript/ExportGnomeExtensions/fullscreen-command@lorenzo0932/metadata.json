@@ -1,0 +1,10 @@
+{
+  "uuid": "fullscreen-command@lorenzo0932",
+  "name": "Fullscreen Command",
+  "description": "Run a command when a window enters fullscreen, another when it leaves.",
+  "shell-version": ["47", "48", "49"],
+  "url": "https://github.com/lorenzo0932/fullscreen-command",
+  "version": 2,
+  "version-name": "1.1",
+  "settings-schema": "org.gnome.shell.extensions.fullscreen-command"
+}

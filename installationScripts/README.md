@@ -37,7 +37,8 @@ To use these scripts, follow the steps below:
 *   **`installMPV.sh`**: Installs the MPV configuration (synced from `~/.config/mpv`) to the selected MPV config directory (native or Flatpak), including custom scripts, shaders, and fonts.
 *   **`installNautilusScripts.sh`**: Copies the Nautilus context menu scripts (from `nautilus/scripts/`) to `~/.local/share/nautilus/scripts/`, making them available within the Nautilus file manager.
 *   **`installScripts.sh`**: Copies the `myScript` directory to `~/.local/share/myScript` (without overwriting newer local files), then adds the script directories to the system's PATH, allowing them to be executed from any terminal location.
-*   **`installServices.sh`**: Installs the systemd user units in `~/.config/systemd/user/` and enables the ones in use (AniDownloader, Flatpak updates, invia-watt, rsync sync, Sunshine, Xbox monitor).
+*   **`installDeps.sh`**: Installs the system dependencies required by the ambilight daemon (`screenshot_portal.py`) and the Drevo Tyrfing V2 keyboard sync (`drevo_keyboard_sync.py`): dnf packages (`python3-numpy`, `python3-gobject-base`, GStreamer + pipewire, `mosquitto`, `hidapi`), the `dtv2` Python library in `~/.local/venvs/dtv2`, and the udev rule `myScript/udev/99-drevo-tyrfing.rules` (copied to `/etc/udev/rules.d/`). Idempotent; requires `sudo`.
+*   **`installServices.sh`**: Installs the systemd user units in `~/.config/systemd/user/` and enables the ones in use (AniDownloader, Flatpak updates, invia-watt, rsync sync, ambilight-keyboard, Sunshine, Xbox monitor).
 
 ### Important Notes:
 

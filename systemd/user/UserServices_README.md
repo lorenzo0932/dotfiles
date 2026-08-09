@@ -4,6 +4,9 @@ This directory contains systemd user-level unit files (`.service` and `.timer`) 
 
 ## Services (`.service` files)
 
+*   **[ambilight.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/ambilight.service)**: Ambilight daemon (`screenshot_portal.py`): analizza lo schermo e pubblica il colore dominante su MQTT per la strip LED. Attivato dall'estensione GNOME fullscreen-command (o manualmente).
+*   **[ambilight-immersive.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/ambilight-immersive.service)**: Come `ambilight.service` ma con `--immersive`: stesso colore attenuato anche sulla luce camera (soffitto).
+*   **[ambilight-keyboard.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/ambilight-keyboard.service)**: Ambilight tastiera (Drevo Tyrfing V2, `drevo_keyboard_sync.py`): segue `fedora/light/led/color` e applica il colore alla tastiera via `dtv2`. Sempre attivo (enable `--now`); su `fedora/light/end` (e `fedora/light/start`) torna al colore default della strip (arancione HS 29.081/88.976) **sempre acceso**: luminosità giorno 100% / notte 25%, con la notte da 30 min prima del tramonto (stessa soglia dell'automazione HA "Ambilight fine sessione"). Richiede il venv `~/.local/venvs/dtv2` e la udev rule (vedi `installDeps.sh`).
 *   **[anidownloaderd.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/anidownloaderd.service)**: Headless AniDownloader daemon.
 *   **[Shutdown.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/Shutdown.service)**: Implements automated system power shutdown routines.
 *   **[flatpak-update.service](file:///home/lorenzo/Documenti/GitHub/dotfiles/systemd/user/flatpak-update.service)**: Triggers auto-updates for installed Flatpaks.

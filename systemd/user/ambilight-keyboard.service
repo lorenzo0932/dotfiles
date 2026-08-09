@@ -1,0 +1,15 @@
+[Unit]
+Description=Ambilight tastiera: Drevo Tyrfing V2 segue i colori schermo (MQTT)
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/home/lorenzo/.local/venvs/dtv2/bin/python3 /home/lorenzo/.local/share/myScript/GameMode/drevo_keyboard_sync.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

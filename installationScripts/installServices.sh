@@ -18,7 +18,7 @@ cp -r "$SCRIPT_DIR/../systemd/user/"*.service "$SCRIPT_DIR/../systemd/user/"*.ti
 systemctl --user daemon-reload
 
 # Abilito i servizi e i timer effettivamente in uso
-systemctl --user enable --now anidownloader-check.timer anidownloaderd.service flatpak-update.timer invia-watt.timer rsync_sync.timer
+systemctl --user enable --now anidownloader-check.timer anidownloaderd.service flatpak-update.timer invia-watt.timer rsync_sync.timer ambilight-keyboard.service
 systemctl --user enable sunshine.service xbox-monitor.service
 
 echo "Installazione dei servizi completata."
