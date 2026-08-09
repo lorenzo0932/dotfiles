@@ -61,11 +61,17 @@ SUNSET_OFFSET_MIN = 30
 
 CONF = os.path.expanduser("~/.config/mqtt.env")
 
+# --verbose: logga anche le applicazioni di colore ("tastiera: ..."); di
+# default il journal resta pulito (le transizioni le logga il daemon).
+VERBOSE = "--verbose" in sys.argv[1:]
+
 state = {"last": None, "has": False}
 stop = threading.Event()
 
 
-def log(msg):
+def log(msg, verbose=False):
+    if verbose and not VERBOSE:
+        return
     print(time.strftime("%H:%M:%S") + " " + str(msg), flush=True)
 
 
@@ -87,7 +93,7 @@ def kbd_apply(rgb, bri_pct, reason, silent=False):
         state["last"] = (rgb, bri_pct)
         state["has"] = True
         if not silent:
-            log(f"tastiera: rgb={rgb} bri={bri_pct}% [{reason}]")
+            log(f"tastiera: rgb={rgb} bri={bri_pct}% [{reason}]", verbose=True)
     except Exception as e:
         log(f"tastiera non raggiungibile: {e}")
 

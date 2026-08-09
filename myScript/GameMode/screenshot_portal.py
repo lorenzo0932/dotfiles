@@ -106,7 +106,9 @@ s = {"session": None, "node": None, "fd": None, "restore_token": None,
 lock = threading.Lock()
 
 
-def log(msg):
+def log(msg, verbose=False):
+    if verbose and not s.get("verbose"):
+        return
     line = time.strftime("%H:%M:%S") + " " + str(msg)
     print(line, flush=True)
     try:
@@ -356,12 +358,12 @@ def analyze():
     with lock:
         frame = s["last_frame"]
     if frame is None:
-        log("nessun frame ancora")
+        log("nessun frame ancora", verbose=True)
         return True
     t0 = time.perf_counter()
     publish_color(frame)
     dt = (time.perf_counter() - t0) * 1000
-    log(f"analisi: {dt:.0f}ms")
+    log(f"analisi: {dt:.0f}ms", verbose=True)
     return True
 
 
@@ -472,7 +474,7 @@ def send_pub(th, ts, b_pct, hue_label):
 def publish_color(frame):
     res = dominant_hsv(frame)
     if res is None:
-        log("scena senza colore: nessun publish (ultimo colore mantenuto)")
+        log("scena senza colore: nessun publish (ultimo colore mantenuto)", verbose=True)
         return
     now = time.time()
     lp = s["last_pub"]
@@ -495,7 +497,7 @@ def publish_color(frame):
             s["last_bri_time"] = now
             send_pub(lp[0], lp[1], b_pct, f"bri su scena ambigua ({db:.0f}%)")
         else:
-            log(f"scena ambigua: colore fermo, bri invariata ({b_pct}%)")
+            log(f"scena ambigua: colore fermo, bri invariata ({b_pct}%)", verbose=True)
         return
     th, ts, scene_v, hue_label = res
     ts = max(ts, 0.45)
@@ -520,7 +522,7 @@ def publish_color(frame):
         if dh > PERSIST_DEG:
             s["dir_hold"] += 1
             if s["dir_hold"] < PERSIST_TICKS:
-                log(f"salto {dh:.0f}°: conferma {s['dir_hold']}/{PERSIST_TICKS}")
+                log(f"salto {dh:.0f}°: conferma {s['dir_hold']}/{PERSIST_TICKS}", verbose=True)
                 return
         else:
             s["dir_hold"] = 0
@@ -529,7 +531,7 @@ def publish_color(frame):
     # Cooldown: tra un publish e il successivo passa almeno COOLDOWN secondi,
     # cosi' il fade hardware arriva a destinazione prima del prossimo cambio.
     if now - s["last_pub_time"] < COOLDOWN:
-        log(f"cooldown: prossimo publish tra {COOLDOWN - (now - s['last_pub_time']):.1f}s")
+        log(f"cooldown: prossimo publish tra {COOLDOWN - (now - s['last_pub_time']):.1f}s", verbose=True)
         return
     # Color lock adattivo: la stabilita' richiesta dipende da quanto il colore
     # attuale e' lontano dall'ultimo pubblicato. Cambi spettacolari (>120°)
@@ -549,7 +551,7 @@ def publish_color(frame):
                 if d > spread:
                     spread = d
         if spread > LOCK_DEG / 360.0:
-            log(f"colore instabile (spread {spread * 360:.0f}°, need {need}): nessun publish")
+            log(f"colore instabile (spread {spread * 360:.0f}°, need {need}): nessun publish", verbose=True)
             return
     # Gate di pubblicazione: cambio colore (deadband hue/sat) oppure cambio di
     # SOLA luminosita' (deadband PUB_BRI_DELTA + holdoff BRIGHT_HOLD). Un cambio
@@ -561,7 +563,7 @@ def publish_color(frame):
         bri_changed = (db >= PUB_BRI_DELTA) and \
             (now - s["last_bri_time"] >= BRIGHT_HOLD)
         if not (color_changed or bri_changed):
-            log(f"invariato ({hue_label} bri:{b_pct}%): nessun publish")
+            log(f"invariato ({hue_label} bri:{b_pct}%): nessun publish", verbose=True)
             return
     s["last_pub"] = (th, ts, b_pct)
     s["last_pub_time"] = now
@@ -591,9 +593,10 @@ def shutdown(*_):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] != "daemon":
-        print("uso: screenshot_portal.py daemon [--immersive]", file=sys.stderr)
+        print("uso: screenshot_portal.py daemon [--immersive] [--verbose]", file=sys.stderr)
         sys.exit(1)
     s["immersive"] = "--immersive" in sys.argv[2:]
+    s["verbose"] = "--verbose" in sys.argv[2:]
     PID_FILE = "/tmp/ambilight_daemon.pid"
     if os.path.isfile(PID_FILE):
         try:
