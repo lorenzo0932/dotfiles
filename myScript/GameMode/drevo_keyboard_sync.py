@@ -45,6 +45,13 @@ DEFAULT_HS = (29.081, 88.976)   # hue, sat % (da automations.yaml di HA)
 BRI_DAY = 100                   # pct diurno (come la strip)
 BRI_NIGHT = 25                  # pct notturno
 
+# Floor luminosita' in modalita' dinamica (mqtt): la Drevo ha solo 6 step
+# hardware (dtv2: round(bri/100*6)) e con scene scure il daemon pubblica
+# ~30% = step 2, quasi invisibile. Floor a 59% -> sempre >= step 4 di 6
+# (misurato 2026-08-09 con scene di riferimento). Vale SOLO quando il
+# servizio ambilight e' attivo; il default giorno/notte resta invariato.
+KBD_BRI_MIN = 59
+
 # Soglia giorno/notte: la notte inizia SUNSET_OFFSET_MIN minuti prima del
 # tramonto (stesso offset usato da HA nella condizione sun). Coordinate
 # uguali a quelle di Home Assistant (core.config).
@@ -94,6 +101,7 @@ def parse_color(payload):
 
 
 def apply_color(h_deg, s_pct, b_pct, reason):
+    b_pct = max(b_pct, KBD_BRI_MIN)
     r, g, b = colorsys.hsv_to_rgb(h_deg / 360.0, s_pct / 100.0, b_pct / 100.0)
     kbd_apply((int(round(r * 255)), int(round(g * 255)),
                int(round(b * 255))), b_pct, reason)
