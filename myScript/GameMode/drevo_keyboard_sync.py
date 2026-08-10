@@ -29,8 +29,6 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 
-from dtv2 import dtv2
-
 MQTT_HOST = "192.168.1.39"
 TOPIC_COLOR = "fedora/light/led/color"
 TOPIC_START = "fedora/light/start"
@@ -38,6 +36,14 @@ TOPIC_END = "fedora/light/end"
 
 REASSERT_SEC = 2.0      # riapplica l'ultimo colore (override combo Fn)
 RECONNECT_DELAY = 3.0   # attesa tra le riconnessioni del sub MQTT
+ERR_LOG_INTERVAL = 60.0 # rate-limit errore tastiera nel journal (il retry
+                        # fallito ogni 2s non deve allagare il log)
+KBD_APPLY_TIMEOUT = 5.0 # il colore lo applica un subprocess: se il device e'
+                        # incastrato (transfer libusb che blocca per sempre)
+                        # il figlio viene ucciso e il daemon non si blocca
+
+HELPER = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                      "kbd_apply_one.py")
 
 # Colore di default = default della strip (automazione HA "Ambilight fine
 # sessione": hs_color 29.081, 88.976). La tastiera resta sempre accesa.
@@ -65,7 +71,7 @@ CONF = os.path.expanduser("~/.config/mqtt.env")
 # default il journal resta pulito (le transizioni le logga il daemon).
 VERBOSE = "--verbose" in sys.argv[1:]
 
-state = {"last": None, "has": False}
+state = {"last": None, "has": False, "last_err_log": 0.0, "err_active": False}
 stop = threading.Event()
 
 
@@ -88,14 +94,28 @@ def conf_load():
 
 def kbd_apply(rgb, bri_pct, reason, silent=False):
     try:
-        kbd = dtv2()
-        kbd.static(rgb, brightness=bri_pct)
+        proc = subprocess.run(
+            [sys.executable, HELPER,
+             str(rgb[0]), str(rgb[1]), str(rgb[2]), str(int(bri_pct))],
+            timeout=KBD_APPLY_TIMEOUT,
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        err = proc.stderr.strip() if proc.returncode != 0 else None
+    except subprocess.TimeoutExpired:
+        err = "timeout: il device non risponde"
+    if err is None:
         state["last"] = (rgb, bri_pct)
         state["has"] = True
+        if state["err_active"]:
+            state["err_active"] = False
+            log("tastiera ripristinata")
         if not silent:
             log(f"tastiera: rgb={rgb} bri={bri_pct}% [{reason}]", verbose=True)
-    except Exception as e:
-        log(f"tastiera non raggiungibile: {e}")
+    else:
+        state["err_active"] = True
+        now = time.time()
+        if now - state["last_err_log"] >= ERR_LOG_INTERVAL:
+            state["last_err_log"] = now
+            log(f"tastiera non raggiungibile: {err}")
 
 
 def parse_color(payload):
