@@ -54,11 +54,18 @@ Config unica sincronizzata in `configs/opencode/` (regola dedicata in rSync.sh):
 le regole sotto sono imposte dalla config (compaction automatica, pin dei
 modelli, steps) o dal comportamento da tenere in sessione.
 
-- **Modelli**: default `opencode-go/deepseek-v4-flash` ovunque. `plan` è
-  pinato su `opencode-go/glm-5.2` (sessioni lean: letture mirate, compatte
-  presto, max 1-2 al mese TOTALI tra tutte le macchine). **BANNATI anche via
-  /models**: `gpt-5.6-luna` (cache write costosa), `qwen3.8-max`/`qwen3.7-max`
-  (pool $15), `kimi-k3`/`kimi-k2.7-code` (input $3/M), `grok-4.5`, `glm-5.3`.
+- **Modelli**: default `opencode-go/deepseek-v4-flash` ovunque, incluso `plan`
+  (benchmark v2: flash batte i premium in agentico a 1/35 del costo). I
+  premium SOLO a richiesta esplicita:
+  - `/second-opinion` (comando dedicato): `gpt-5.6-luna` single-shot economico
+    (~$0.006/uso). **MAI sessioni lunghe su Luna**: la cache write costa
+    $0.25/M ed esplode su contesto grande.
+  - `glm-5.2` via /models: solo planning deterministico di problemi ambigui,
+    sessione lean, max 1-2 al mese TOTALI tra tutte le macchine.
+  - `qwen3.8-max` via /models: solo casi estremi (refactoring enormi, bug
+    strani), max 1-2 sessioni al mese (pool $15).
+  - **BANNATI anche via /models**: `qwen3.7-max`, `kimi-k3`/`kimi-k2.7-code`
+    (input $3/M), `grok-4.5`, `glm-5.3`.
 - **Niente switch di modello a metà sessione**: la cache prompt è legata al
   modello; cambiarlo ri-processa l'intero storico a prezzo pieno (sessioni
   grandi = $10+ per ogni switch). Se serve un modello diverso: nuova sessione.
