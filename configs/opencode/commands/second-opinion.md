@@ -17,3 +17,7 @@ Formato della risposta (markdown, massimo 30 righe):
 
 Regole: sii critico e specifico (niente lodi generiche). NON modificare file,
 NON eseguire comandi: rispondi SOLO con la seconda opinione, in italiano.
+Se per rispondere ti servirebbero più di 2-3 letture di file, FERMATI: dì
+esplicitamente "contesto insufficiente — prepara un bundle di fatti e riprova
+(su flash)" invece di esplorare oltre (Luna deve restare single-shot: il suo
+costo cresce rapidamente su contesto grande).

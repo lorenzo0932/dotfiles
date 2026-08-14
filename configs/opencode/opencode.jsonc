@@ -11,7 +11,8 @@
       "model": "opencode-go/deepseek-v4-flash"
     },
     "scout": {
-      "model": "opencode-go/deepseek-v4-flash"
+      "model": "opencode-go/deepseek-v4-flash",
+      "mode": "subagent"
     },
     "plan": {
       "model": "opencode-go/deepseek-v4-flash",
