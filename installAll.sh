@@ -11,5 +11,6 @@ chmod +x *.sh
 ./installServices.sh
 ./installMPV.sh
 ./installNautilusScripts.sh
+./installOpencodeConfig.sh
 
 echo "Installazione completata."

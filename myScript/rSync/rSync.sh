@@ -6,6 +6,7 @@ MYSCRIPTS="/home/lorenzo/.local/share/myScript"
 NAUTILUS_SCRIPTS="/home/lorenzo/.local/share/nautilus"
 SYSTEMD_SERVICES="/home/lorenzo/.config/systemd"
 MPV_CONFIG="$HOME/.config/mpv"
+OPENCODE_CONFIG="$HOME/.config/opencode"
 
 # Define your destination directory (your dotfiles repo folder)
 DEST="/home/lorenzo/Documenti/GitHub/dotfiles"
@@ -41,6 +42,9 @@ rsync -au --delete --exclude-from='exclude.txt' "$NAUTILUS_SCRIPTS/" "$DEST/naut
 rsync -au --delete --exclude-from='exclude.txt' "$SYSTEMD_SERVICES/" "$DEST/systemd/"
 # Config MPV reale: ~/.config/mpv e' la fonte di verita' (watch_later e bak/cache sono transienti e vanno esclusi)
 rsync -a --delete --exclude='watch_later/' --exclude='bak/cache/' "$MPV_CONFIG/" "$DEST/configs/mpv/"
+# Config opencode: config unica multi-macchina (budget, compaction, pin modelli).
+# Esclusi i file del plugin oh-my-opencode (rigenerabili o locali).
+rsync -a --delete --exclude='node_modules/' --exclude='package-lock.json' --exclude='README.md' --exclude='.gitignore' "$OPENCODE_CONFIG/" "$DEST/configs/opencode/"
 echo "Sincronizzazione completata."
 
 # --- Git Operations ---
