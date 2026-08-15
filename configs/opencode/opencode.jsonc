@@ -15,23 +15,7 @@
       "mode": "subagent"
     },
     "plan": {
-      "model": "opencode-go/deepseek-v4-flash",
-      "steps": 40
-    },
-    "build": {
-      "steps": 60
-    }
-  },
-  "permission": {
-    "edit": "ask",
-    "bash": {
-      "*": "ask",
-      "code *": "allow",
-      "git status*": "allow",
-      "git diff*": "allow",
-      "git log*": "allow",
-      "ls*": "allow",
-      "pwd": "allow"
+      "model": "opencode-go/deepseek-v4-flash"
     }
   }
 }

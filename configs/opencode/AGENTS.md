@@ -57,9 +57,14 @@ modelli, steps) o dal comportamento da tenere in sessione.
 - **Modelli**: default `opencode-go/deepseek-v4-flash` ovunque, incluso `plan`
   (benchmark v2: flash batte i premium in agentico a 1/35 del costo). I
   premium SOLO a richiesta esplicita:
-  - `/second-opinion` (comando dedicato): `gpt-5.6-luna` single-shot economico
-    (~$0.006/uso). **MAI sessioni lunghe su Luna**: la cache write costa
-    $0.25/M ed esplode su contesto grande.
+  - `/second-opinion-gemini` (comando dedicato): `google/gemini-3.7-flash`,
+    single-shot. Vincitore dell'A/B test su `gemini-3.5-flash` (verdetto più
+    netto, piano DTO più completo) e su Luna per l'insight di dominio (es.
+    flussi video non esposti in schema.org).
+  - `/second-opinion-gpt` (comando dedicato): `gpt-5.6-luna` single-shot
+    economico (~$0.006/uso), piano operativo più dettagliato. **MAI sessioni
+    lunghe su Luna**: la cache write costa $0.25/M ed esplode su contesto
+    grande.
   - `glm-5.2` via /models: solo planning deterministico di problemi ambigui,
     sessione lean, max 1-2 al mese TOTALI tra tutte le macchine.
   - `qwen3.8-max` via /models: solo casi estremi (refactoring enormi, bug
@@ -83,3 +88,16 @@ modelli, steps) o dal comportamento da tenere in sessione.
   per macchina) + console https://opencode.ai/auth (consumo pool Go — l'unico
   numero autorevole: il pool è condiviso tra TUTTE le macchine con la stessa
   chiave).
+
+## RAM e tmpfs — REGOLA RIGIDA (violata 2 volte, mai più)
+
+- **`/tmp` è tmpfs = RAM** (16G): MAI file grossi lì dentro senza controllare
+  prima `free -h`. Worktree git, build, fixture: roba piccola ok, roba da GB
+  assolutamente no (o monitora lo stato con `free -h`/`df -h /tmp` prima e
+  durante).
+- **`cmake --build -j$(nproc)` su macchina a 32 core = OOM sicuro** con link
+  LTO (+ Jellyfin/Steam/Telegram/opencode aperti). Usare `-j8` o `-j16` max,
+  mai `-j$(nproc)` senza controllo memoria. Se la macchina è sotto pressione:
+  `-j4`.
+- Prima di build pesanti: `free -h`. Dopo un OOM: verificare processi orfani
+  (`ps aux --sort=-%mem`) e spazio `/tmp`.
