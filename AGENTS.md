@@ -9,6 +9,7 @@ Repo personale di dotfiles/script: **backup periodico** di una macchina Linux (F
 - **Modificare file direttamente nel repo è inutile o pericoloso**: al prossimo rSync vengono sovrascritti (rsync `-u` non copia solo se il dest è più nuovo). Per cambiare una config: modifica il file **live**, poi propaga con `rSync.sh` (o `rSync_NoCommit.sh` per sincronizzare senza committare).
 - Eccezioni — file che vivono SOLO nel repo e non vengono sovrascritti: `installAll.sh`, `installationScripts/`, `README.md`, `.gitignore`, `tuned_config/`, `AGENTS.md`.
 - `configs/mpv/` è sincronizzato da una regola dedicata da `~/.config/mpv` (la config reale, escluso `watch_later/` e `bak/cache/`). Non spostare manualmente quella cartella.
+- `configs/opencode/` è sincronizzato da una regola dedicata da `~/.config/opencode` (config unica multi-macchina di opencode; esclusi `node_modules/`, `package-lock.json`, `README.md`, `.gitignore`).
 - `protonvpn_reconnect.service` è gestita dall'app ProtonVPN ed è esclusa dal sync (`exclude.txt`): resta solo in live.
 - `exclude.txt` (in `myScript/rSync/`) esclude dal sync: `*.log`, `__pycache__`, `.mypy_cache`, `dist`, `build`, `gemini.env`, `AniDownloader.*`, ecc. È sia in live che nel repo: modifica la copia live.
 - `~/.config/autostart/` NON è sincronizzato (scelta dell'utente): gli `.desktop` di avvio automatico vivono solo in live.
