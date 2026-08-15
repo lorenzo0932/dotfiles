@@ -8,7 +8,10 @@ questo file, il comportamento corretto è segnalare la contraddizione.
 
 ## Prima di modificare un file
 
-- Prima di ogni modifica/creazione (`edit`, `write`, `apply_patch`): apri il file in VSCode con `code --goto <file>:<riga>` per mostrare il codice di riferimento.
+- Prima di ogni modifica/creazione (`edit`, `write`, `apply_patch`): apri il file in VSCode con `code --goto <file>:<riga>` per mostrare il codice di riferimento SOLO se:
+  - VSCode è aperto (`pgrep -x code` con esito positivo), E
+  - opencode NON sta girando nel terminale integrato di VSCode (`$TERM_PROGRAM` è diverso da `vscode`).
+  - Con opencode nel terminale integrato di VSCode i diff degli edit sono già visibili nel TUI a fianco dell'editor: il goto è ridondante e va saltato.
 - Spiega in 1–2 righe il motivo della modifica e cosa cambierà, poi procedi.
 - La conferma finale resta il prompt `edit: ask` (once / always / reject).
 
