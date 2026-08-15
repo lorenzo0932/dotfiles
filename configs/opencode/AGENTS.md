@@ -65,6 +65,12 @@ modelli, steps) o dal comportamento da tenere in sessione.
     economico (~$0.006/uso), piano operativo più dettagliato. **MAI sessioni
     lunghe su Luna**: la cache write costa $0.25/M ed esplode su contesto
     grande.
+  - `/review-codebase` (comando dedicato): `google/gemini-3.7-flash`,
+    revisione one-shot dell'intera codebase (~380K token) via bundle.
+    Prima: `scripts/bundle_codebase.sh` nel progetto (genera
+    `.opencode/bundle/codebase_bundle.md`, gitignored, ed esclude gli
+    artefatti generati, es. `embedded_web_data.cpp` — senza di esso il
+    bundle non entrerebbe nel contesto di 1M).
   - `glm-5.2` via /models: solo planning deterministico di problemi ambigui,
     sessione lean, max 1-2 al mese TOTALI tra tutte le macchine.
   - `qwen3.8-max` via /models: solo casi estremi (refactoring enormi, bug
