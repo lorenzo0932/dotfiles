@@ -54,7 +54,7 @@ modelli, steps) o dal comportamento da tenere in sessione.
 - **Verifica mirata**: `ctest --test-dir build -R <target>` e `bash -n`
   invece della suite completa a ogni passo; la verifica piena solo a fine
   feature.
-- **1 feature = 1 sessione**: resoconto breve (commits + stato), compact, poi
+- **1 feature = 1 sessione**: riassunto breve (commits + stato), compact, poi
   sessione nuova. La compaction automatica (config) tiene comunque basso il
   costo dei turni successivi.
 - **Monitoraggio**: ogni settimana `opencode stats --days 7` (attribuzione
@@ -85,29 +85,42 @@ modelli, steps) o dal comportamento da tenere in sessione.
 - Eccezione dichiarata: i timer/script che l'utente installa deliberatamente
   (es. l'auto-push di `rSync.sh` nel repo dotfiles) sono una sua scelta, non
   una violazione: la regola vincola l'AGENT, non i suoi strumenti.
-- **Ciclo di vita di un branch di feature/fix**: creazione da dev →
-  implementazione locale → push → merge → delete, dove push/merge/delete
-  avvengono SOLO su richiesta esplicita (mai branch locali orfani).
-- Niente branch per housekeeping/CI/docs: commit diretti su dev.
+- **Ciclo di vita di una feature/fix (workflow standard)**:
+  1. Branch: `git checkout -b <tipo>/<slug>` da dev.
+  2. Piano: `plan/<slug>.md` sul branch, **mai committato né pushato** — è il
+     punto di rientro se la feature non viene completata. può essere generato
+     con `/plan`.
+  3. Implementazione: commit locali solo di codice (mai piano, `.opencode/`
+     o artefatti AI).
+  4. Verifica: a implementazione finita eseguire `/verify` e lasciare la
+     review all'utente.
+  5. **Push del branch e merge su dev SOLO su richiesta esplicita** (mai
+     automatici). A merge riuscito: delete della branch + eliminazione del
+     file piano. Mai branch locali orfani.
+- `AGENTS.md` (repo-level) è documentazione di progetto e vive su dev/public.
+- **Branch obbligatorio** per operazioni che toccano sorgenti o workflow in
+  modo non banale (funzionalità, fix, performance, refactoring, CI multi-step
+  con giri di verifica). Commit diretti su dev SOLO per micro-correzioni di
+  housekeeping (una riga in un workflow, un commento, un path) o per
+  modifiche docs un-file (es. aggiornamento dell'AGENTS.md di repo).
 
 ## Artefatti AI — MAI su GitHub (regola rigida, tutti i repo)
 
-- Piani, `AGENTS.md`, resoconti, bundle di codice, prompt, tool AI e file di
+- Piani, resoconti, bundle di codice, prompt, tool AI e file di
   configurazione dell'agent: **mai committati/pushati su repo remoti
   pubblici o condivisi**. Vivono solo in locale: su una branch mai pushatta
-  (es. `local/reference`) o in cartelle gitignored (es. `plan/`, `.opencode/`).
-- Se serve "storico" dei piani: i commit li fa su una branch locale
-  (i gitignore non bloccano i file già tracciati, quindi i piani continuano
-  a committarsi lì). Il pre-push hook, se presente, blocca solo il push.
+  o in cartelle gitignored (es. `plan/`, `.opencode/`). L'`AGENTS.md` di repo
+  è eccezione: essendo documentazione di progetto, può essere tracciato su
+  dev/public.
+- Niente "storico" permanente di piani: i piani sono effimeri per feature e
+  muoiono col merge. Il pre-push hook, se presente, blocca solo il push dei
+  branch riservati.
 
-## Tracciamento operazioni — SOLO in locale (regola rigida)
+## Piani — effimeri, per feature (regola rigida)
 
-- Ogni operazione (feature, fix, refactoring) parte da un **file di piano
-  .md** locale e termina con un **file di resoconto** rispetto al piano
-  (esito, deviazioni dal piano, commit, verifiche fatte).
-- Se il progetto ha già una struttura (es. `plan/` + `plan/done/` su una
-  branch locale mai pushatta), si segue quella; altrimenti se ne crea una
-  locale (es. `plan/` gitignored).
-- Nessuna operazione si considera chiusa senza il suo resoconto.
-- Il resoconto è un FILE (non solo un messaggio di chat): la traccia deve
-  restare anche a sessione chiusa.
+- Ogni feature/fix parte dal file di piano `plan/<slug>.md` creato sul branch
+  dedicato: obiettivi, passi, stato. **Non viene mai committato né pushato**:
+  è solo il punto di rientro se la sessione non completa la feature.
+- A feature completa (test verdi, `/verify`, review utente) e merge su dev:
+  il file piano viene eliminato insieme alla branch. Il diff e le commit
+  raccontano quanto fatto: nessun archivio storico di piani da gestire.
