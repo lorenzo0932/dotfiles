@@ -1,7 +1,6 @@
 ---
-description: Revisione architettonica one-shot dell'intera codebase (Gemini 3.7 Flash — bundle da scripts/bundle_codebase.sh)
+description: Revisione architettonica one-shot dell'intera codebase (bundle da scripts/bundle_codebase.sh — usa il modello selezionato in sessione)
 agent: plan
-model: google/gemini-3.7-flash
 ---
 
 Sei un revisore architettonico indipendente e diretto. Analizza l'intera codebase

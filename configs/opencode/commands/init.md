@@ -16,8 +16,9 @@ rigenera il file AGENTS.md:
    - riuso del contesto già letto nella sessione (non rileggere file invariati)
    - 1 feature = 1 sessione, compact prima di iniziare un nuovo task lungo
    - niente switch di modello a metà sessione (invalida la cache prompt)
-   - modelli: default deepseek-v4-flash; Plan su glm-5.2 solo per sessioni
-     lean e importanti
+   - modelli: default deepseek-v4-flash; i comandi task (/plan, /verify, ecc.)
+     e gli agenti seguono il modello selezionato con /models; i premium solo
+     a richiesta esplicita (second opinion pinnate)
 
 Se AGENTS.md esiste già, non sovrascriverlo: aggiorna solo le sezioni superate
 e assicurati che la sezione standard sia presente in fondo.

@@ -21,9 +21,12 @@ Config unica sincronizzata in `configs/opencode/` (regola dedicata in rSync.sh):
 le regole sotto sono imposte dalla config (compaction automatica, pin dei
 modelli, steps) o dal comportamento da tenere in sessione.
 
-- **Modelli**: default `opencode-go/deepseek-v4-flash` ovunque, incluso `plan`
-  (benchmark v2: flash batte i premium in agentico a 1/35 del costo). I
-  premium SOLO a richiesta esplicita:
+- **Modelli**: default `opencode-go/deepseek-v4-flash` (benchmark v2: flash
+  batte i premium in agentico a 1/35 del costo). I comandi task (`/plan`,
+  `/verify`, `/init`, `/review-codebase`) e gli agenti (primary e subagent,
+  quindi anche explore/scout via Task) usano il modello selezionato con
+  `/models` nella sessione corrente — nessun pin, niente sorprese alla
+  risoluzione. I premium SOLO a richiesta esplicita:
   - `/second-opinion-gemini` (comando dedicato): `google/gemini-3.7-flash`,
     single-shot. Vincitore dell'A/B test su `gemini-3.5-flash` (verdetto più
     netto, piano DTO più completo) e su Luna per l'insight di dominio (es.
@@ -32,8 +35,8 @@ modelli, steps) o dal comportamento da tenere in sessione.
     economico (~$0.006/uso), piano operativo più dettagliato. **MAI sessioni
     lunghe su Luna**: la cache write costa $0.25/M ed esplode su contesto
     grande.
-  - `/review-codebase` (comando dedicato): `google/gemini-3.7-flash`,
-    revisione one-shot dell'intera codebase (~380K token) via bundle.
+  - `/review-codebase` (comando dedicato): revisione one-shot dell'intera
+    codebase (~380K token) via bundle, sul modello selezionato in sessione.
     Prima: `scripts/bundle_codebase.sh` nel progetto (genera
     `.opencode/bundle/codebase_bundle.md`, gitignored, ed esclude gli
     artefatti generati, es. `embedded_web_data.cpp` — senza di esso il
