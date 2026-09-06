@@ -78,14 +78,15 @@ HELPER = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # sessione": hs_color 29.081, 88.976). La tastiera resta sempre accesa.
 DEFAULT_HS = (29.081, 88.976)   # hue, sat % (da automations.yaml di HA)
 BRI_DAY = 100                   # pct diurno (come la strip)
-BRI_NIGHT = 25                  # pct notturno
+BRI_NIGHT = 83                  # pct notturno: la tastiera resta sempre sugli
+                                # step 5-6, mai sotto
 
 # Floor luminosita' in modalita' dinamica (mqtt): la Drevo ha solo 6 step
 # hardware (dtv2: round(bri/100*6)) e con scene scure il daemon pubblica
-# ~30% = step 2, quasi invisibile. Floor a 59% -> sempre >= step 4 di 6
-# (misurato 2026-08-09 con scene di riferimento). Vale SOLO quando il
+# ~30% = step 2, quasi invisibile. Floor a 83% -> sempre >= step 5 di 6
+# (round(83/100*6)=5; step 5 e 6, mai sotto). Vale SOLO quando il
 # servizio ambilight e' attivo; il default giorno/notte resta invariato.
-KBD_BRI_MIN = 59
+KBD_BRI_MIN = 83
 
 # Soglia giorno/notte: la notte inizia SUNSET_OFFSET_MIN minuti prima del
 # tramonto (stesso offset usato da HA nella condizione sun). Coordinate
