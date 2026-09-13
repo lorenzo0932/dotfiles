@@ -1,14 +1,57 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "opencode-go/deepseek-v4-flash-free",
-  "small_model": "opencode-go/deepseek-v4-flash-free",
+  "model": "ollama/omnicoder-9b-32k",
+  "small_model": "ollama/qwen35-9b-32k",
   "compaction": {
     "auto": true,
     "tail_turns": 15
   },
   "agent": {
+    "build": {
+      "mode": "primary",
+      "model": "ollama/omnicoder-9b-32k",
+      "description": "Agente principale di sviluppo: implementa, modifica, esegue (veloce e agent-tuned)"
+    },
+    "plan": {
+      "mode": "primary",
+      "model": "ollama/omnicoder-9b-32k",
+      "temperature": 0.1,
+      "description": "Analisi e piani senza modifiche: il piu grounded nei test (7/7)"
+    },
+    "explore": {
+      "mode": "subagent",
+      "model": "ollama/qwen35-9b-32k",
+      "temperature": 0.1,
+      "description": "Esplorazione read-only velocissima della codebase"
+    },
     "scout": {
       "mode": "subagent"
     }
   },
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "omnicoder-9b-32k": {
+          "name": "OmniCoder v2 9B 32k (agent principale)"
+        },
+        "qwen35-9b-32k": {
+          "name": "Qwen3.5 9B 32k (veloce/generale)"
+        },
+        "gemma4-12b-16k": {
+          "name": "Gemma4 12B 16k (ragionamento/multimodale)"
+        },
+        "coder14b-8k": {
+          "name": "Qwen2.5-Coder 14B 8k (tetto qualita code)"
+        },
+        "dscoder-lite-8k": {
+          "name": "DeepSeek-Coder-V2-Lite 8k (MoE veloce)"
+        }
+      }
+    }
+  }
 }

@@ -127,3 +127,16 @@ modelli, steps) o dal comportamento da tenere in sessione.
 - A feature completa (test verdi, `/verify`, review utente) e merge su dev:
   il file piano viene eliminato insieme alla branch. Il diff e le commit
   raccontano quanto fatto: nessun archivio storico di piani da gestire.
+
+## Review grounded — anti-allucinazione (regola, 2026-09-07)
+
+- Vale per `/plan`, `/review-codebase`, `/grounded-review` e qualunque analisi
+  del codice: il comando `/grounded-review` è il template dedicato, con agent
+  `plan` di default.
+- Ogni affermazione fattuale sul codice cita `path:riga` esatti e verificati
+  con `read`/`grep` nella sessione. Senza citazione, non si afferma.
+- Se non è nei file letti: scrivere `NON VERIFICATO`, mai inventare path,
+  funzioni o comportamenti. Distinguere CITATO vs DEDOTTO vs NON VERIFICATO.
+- Motivazione: A/B test 2026-09-07 su repo RealTime_ORIN_CLASTER — senza queste
+  regole il plan ha inventato un modulo (`src/prediction/`) e proposto come
+  "migliorie" feature già esistenti (reconnect, code, config centralizzata).
