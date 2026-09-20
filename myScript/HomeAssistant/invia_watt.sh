@@ -16,14 +16,26 @@ for d in /sys/class/hwmon/hwmon*; do
     fi
 done
 
-# 2. Leggi il Package Power (PPT) reale via ryzen_smu/ryzen_monitor
-#    Nota: va eseguito come root per accedere a /sys/kernel/ryzen_smu_drv/pm_table
-if [ -x "$RYZEN_MONITOR" ]; then
-    PPT_RAW=$(timeout 2 sudo -n "$RYZEN_MONITOR" 2>/dev/null | grep -m1 "PPT")
-    CPU_WATTS=$(echo "$PPT_RAW" | awk -F'|' '{print $1}' | grep -oE '[0-9]+\.[0-9]+' | head -1)
-    if [ -n "$CPU_WATTS" ]; then
-        mosquitto_pub -h "$MQTT_HOST" -u "$MQTT_USER" -P "$MQTT_PASS" -t "fedora/cpu/power" -m "$CPU_WATTS"
+# 2. Leggi il Package Power CPU via RAPL (nessun driver/root richiesto).
+#    Nota 2026-09-17: ramo ryzen_monitor dismesso (modulo ryzen_smu 0.1.2 non compila
+#    su kernel cachyos >= 7.2: API cpuid_* rimosse). RAPL misura lo stesso package power.
+#    Lo script gira ogni 30s via invia-watt.timer: media su finestra precedente.
+RAPL_FILE="/sys/class/powercap/intel-rapl:0/energy_uj"
+RAPL_RANGE="/sys/class/powercap/intel-rapl:0/max_energy_range_uj"
+RAPL_STATE="${XDG_RUNTIME_DIR:-/tmp}/invia_watt_rapl.state"
+if [ -r "$RAPL_FILE" ]; then
+    E_NOW=$(cat "$RAPL_FILE"); T_NOW=$(date +%s%N)
+    if [ -f "$RAPL_STATE" ]; then
+        read -r E_PREV T_PREV < "$RAPL_STATE"
+        if [ "$E_NOW" -ge "$E_PREV" ]; then DE=$((E_NOW - E_PREV));
+        else DE=$(( $(cat "$RAPL_RANGE" 2>/dev/null || echo 0) - E_PREV + E_NOW )); fi
+        DT_NS=$((T_NOW - T_PREV))
+        if [ "$DT_NS" -gt 0 ] && [ "$DE" -ge 0 ]; then
+            CPU_WATTS=$(awk "BEGIN {printf \"%.1f\", $DE / ($DT_NS / 1000000000) / 1000000}")
+            mosquitto_pub -h "$MQTT_HOST" -u "$MQTT_USER" -P "$MQTT_PASS" -t "fedora/cpu/power" -m "$CPU_WATTS"
+        fi
     fi
+    echo "$E_NOW $T_NOW" > "$RAPL_STATE"
 fi
 
 # 3. Leggi e calcola i Watt della GPU (invariato)

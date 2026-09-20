@@ -1,10 +1,10 @@
 [Unit]
 Description=Sunshine self-hosted game stream host for Moonlight.
 StartLimitIntervalSec=500
-StartLimitBurst=5
+StartLimitBurst=20
 
 [Service]
-ExecStart=-/bin/sh -c 'sleep 30 && /usr/bin/sunshine'
+ExecStart=/bin/sh -c 'sleep 30 && /usr/bin/sunshine'
 Restart=on-failure
 RestartSec=5s
 #Flatpak Only
