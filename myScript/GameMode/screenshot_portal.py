@@ -46,7 +46,8 @@ INTERVAL = 0.2        # secondi tra un'analisi colore e l'altra
 # a 200ms, perdite a 100ms; INTERVAL 0.2s = 5Hz e' il massimo sicuro.
 PUB_HUE_DEG = 30.0    # soglia minima di spostamento hue per pubblicare
 PUB_SAT_DELTA = 0.2   # soglia minima di variazione saturazione
-COOLDOWN = 0.3        # intervallo minimo (s) tra due publish
+COOLDOWN = 0.2        # intervallo minimo (s) tra due publish: pari al limite
+                      # misurato del canale (20/20 ok a 200ms, perdite a 100ms)
 LOCK_DEG = 25.0       # color lock: i tick di conferma richiesti devono stare
                       # dentro questa banda. Il numero di tick richiesti e'
                       # adattivo: 1 per salti >120°, 2 per >60°, 4 per il resto
@@ -59,11 +60,13 @@ DOMINANCE = 1.5       # soglia di dominanza: se un cluster hue lontano (>4 bin,
                       # ma la bri continua a seguire la scena. 1.0 = disattiva.
 PERSIST_DEG = 90.0    # salti hue > PERSIST_DEG richiedono conferma di
                       # persistenza direzionale prima del publish
-PERSIST_TICKS = 2     # tick consecutivi (INTERVAL 0.2 = 400ms) con il colore
+PERSIST_TICKS = 1     # tick consecutivi (INTERVAL 0.2 = 200ms) con il colore
                       # lontano dall'ultimo pubblicato per accettare il salto:
-                      # i battiti A-B-A (alternanza tra poli di energia quasi
-                      # uguale) non accumulano mai 2 tick, i cambi scena reali
-                      # (energia 2.5-3.7x) passano in ~400ms
+                      # i battiti A-B-A non accumulano mai il lock (spread) e la
+                      # soglia DOMINANCE li blocca; i cambi scena reali
+                      # (energia 2.5-3.7x) passano in ~200ms. Ridotto da 2 a 1
+                      # (test/latency 2026-10-01: -400ms sui salti grandi,
+                      # nessun flap sul contenuto testato)
 # --- LUMINOSITA' DINAMICA ---
 # La bri segue la luce TOTALE del monitor (media del canale Value su tutto il
 # frame, NON mascherata): stanza che scende nelle scene scure. Curva gamma per
