@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
-"""Ambilight daemon: sessione ScreenCast XDG portal (v7) + GStreamer appsink.
-Pipeline PERSISTENTE: pipewiresrc -> videoconvert -> videoscale -> appsink
-gira in continuo (niente pngenc/filesink/magick per frame). Un thread
-campiona l'ultimo frame; un timer GLib ogni INTERVAL calcola il colore
-dominante (numpy vettorizzato) e pubblica "h,s,b" via MQTT.
+"""Ambilight daemon: due backend di cattura, stessa analisi/MQTT.
+
+- portal (default): sessione ScreenCast XDG portal + GStreamer appsink.
+  Pipeline PERSISTENTE: pipewiresrc -> videoconvert -> videoscale -> appsink
+  gira in continuo (niente pngenc/filesink/magick per frame).
+- kms: lettura diretta dello scanout-buffer via DRM/KMS con ffmpeg-kmsgrab
+  (stile Sunshine, richiede cap_sys_admin sul binario): NESSUN dialogo
+  "Condividi schermo", nemmeno con 2 monitor. Vedi kms_capture.py.
+
+Un thread campiona l'ultimo frame; un timer GLib ogni INTERVAL calcola il
+colore dominante (numpy vettorizzato) e pubblica "h,s,b" via MQTT.
 Alla terminazione pubblica fedora/light/end e chiude la sessione.
 Uso: screenshot_portal.py daemon [--immersive]
+     [--backend=portal|kms] [--connector NOME] [--crtc ID] [--no-follow]
 (con --immersive pubblica lo stesso colore, attenuato, anche sulla luce
 camera: fedora/light/cam/color — il soffitto fa da luce ambiente)
 """
@@ -572,12 +579,107 @@ def publish_color(frame):
     send_pub(th, ts, b_pct, hue_label)
 
 
+# ---------- backend KMS (senza prompt, stile Sunshine) ----------
+
+def _opt(prefix):
+    for a in sys.argv[2:]:
+        if a.startswith(prefix):
+            return a[len(prefix):]
+    return None
+
+
+def kms_pump(reader):
+    """Copia i frame KMS in s['last_frame'] per analyze() (stesso formato)."""
+    last_seq = -1
+    while s["running"]:
+        if s.get("kms_reader") is not reader:
+            return
+        seq = reader.seq
+        if seq != last_seq:
+            frame = reader.get_frame()
+            if frame is not None:
+                with lock:
+                    s["last_frame"] = frame
+                    s["frame_seq"] += 1
+                last_seq = seq
+        time.sleep(INTERVAL)
+
+
+def kms_follow():
+    """Con 2 monitor segue il target (riavvia il reader se cambia CRTC)."""
+    while s["running"]:
+        time.sleep(2.0)
+        if not s["running"] or s.get("kms_reader") is None:
+            return
+        try:
+            import kms_capture
+            target = kms_capture.pick_target(
+                connector=s.get("kms_connector"),
+                crtc=s.get("kms_crtc"))
+        except Exception as e:
+            log(f"kms follow: pick fallito: {e}")
+            continue
+        cur = s.get("kms_crtc_id")
+        if target["crtc_id"] != cur:
+            log(f"kms follow: switch {cur} -> {target['crtc_id']} "
+                f"({target['name']})")
+            try:
+                s["kms_reader"].stop()
+                reader = kms_capture.KMSReader(target["crtc_id"], log=log)
+                reader.start()
+                s["kms_reader"] = reader
+                s["kms_crtc_id"] = target["crtc_id"]
+                threading.Thread(target=kms_pump, args=(reader,),
+                                 daemon=True).start()
+            except Exception as e:
+                log(f"kms follow: riavvio fallito: {e}")
+
+
+def loop_ready_kms():
+    import kms_capture
+    ok, msg = kms_capture.check_capable()
+    if not ok:
+        log(f"kms non utilizzabile: {msg}")
+        loop.quit()
+        return
+    try:
+        target = kms_capture.pick_target(
+            connector=s.get("kms_connector"), crtc=s.get("kms_crtc"))
+    except RuntimeError as e:
+        log(f"kms: {e}")
+        loop.quit()
+        return
+    if len(kms_capture.active_outputs()) > 1 and not s.get("kms_connector") \
+            and not s.get("kms_crtc"):
+        log(f"kms: {len(kms_capture.active_outputs())} output attivi, uso "
+            f"{target['name']} (CRTC {target['crtc_id']}); per fissarlo: "
+            f"--connector {target['name']}")
+    log(f"kms loop avviato su {target['name']} (CRTC {target['crtc_id']})")
+    mqtt_pub("fedora/light/start", "1")
+    reader = kms_capture.KMSReader(target["crtc_id"], log=log)
+    reader.start()
+    s["kms_reader"] = reader
+    s["kms_crtc_id"] = target["crtc_id"]
+    threading.Thread(target=kms_pump, args=(reader,), daemon=True).start()
+    if "--no-follow" not in sys.argv[2:]:
+        threading.Thread(target=kms_follow, daemon=True).start()
+    GLib.timeout_add(int(INTERVAL * 1000), analyze)
+    analyze()
+
+
 # ---------- fine ----------
 
 def shutdown(*_):
     log("terminazione: fine sessione ambilight")
     s["running"] = False
     mqtt_pub("fedora/light/end", "1")
+    reader = s.get("kms_reader")
+    if reader is not None:
+        try:
+            reader.stop()
+        except Exception:
+            pass
+        s["kms_reader"] = None
     if s["pipeline"] is not None:
         s["pipeline"].set_state(Gst.State.NULL)
     if s["session"]:
@@ -593,10 +695,17 @@ def shutdown(*_):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] != "daemon":
-        print("uso: screenshot_portal.py daemon [--immersive] [--verbose]", file=sys.stderr)
+        print("uso: screenshot_portal.py daemon [--immersive] [--verbose] "
+              "[--backend=portal|kms] [--connector NOME] [--crtc ID] "
+              "[--no-follow]", file=sys.stderr)
         sys.exit(1)
     s["immersive"] = "--immersive" in sys.argv[2:]
     s["verbose"] = "--verbose" in sys.argv[2:]
+    backend = _opt("--backend=") or "portal"
+    s["kms_connector"] = _opt("--connector=")
+    s["kms_crtc"] = _opt("--crtc=")
+    s["kms_reader"] = None
+    s["kms_crtc_id"] = None
     PID_FILE = "/tmp/ambilight_daemon.pid"
     if os.path.isfile(PID_FILE):
         try:
@@ -613,5 +722,9 @@ if __name__ == "__main__":
         pass
     signal.signal(signal.SIGTERM, shutdown)
     signal.signal(signal.SIGINT, shutdown)
-    setup_session()
+    if backend == "kms":
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        GLib.timeout_add(100, loop_ready_kms)
+    else:
+        setup_session()
     loop.run()
