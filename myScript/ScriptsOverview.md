@@ -86,6 +86,15 @@ Backs up the enabled GNOME Shell extensions as a lightweight list (no extension 
 *   [ExportGnomeExtensions.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/ExportGnomeExtensions/ExportGnomeExtensions.sh): Non-interactive; writes the enabled UUID list (`enabled-extensions.list`) and the per-extension dconf settings (`extensions-settings.conf`). Run automatically by `rsync_sync.service` (`ExecStartPre`) before every sync.
 *   [RestoreGnomeExtensions.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/ExportGnomeExtensions/RestoreGnomeExtensions.sh): Manual; downloads each extension from extensions.gnome.org, installs it in `~/.local/share/gnome-shell/extensions/`, enables it, and restores the dconf settings. Skips extensions missing/incompatible on EGO (reports them at the end).
 
+### 13. [InputRemapper](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/InputRemapper/)
+Versioned input-remapper preset (mouse side buttons → Alt+Left/Right, workaround per il doppio-step di navigazione di Jellyfin Desktop 2.0.0).
+*   [install-input-remapper.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/InputRemapper/install-input-remapper.sh): Installa il pacchetto, abilita il demone di sistema, copia preset + `config.json` (con autoload) e avvia l'iniezione sul Logitech G305.
+*   [presets/Logitech G305/jellyfin-back-fix.json](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/InputRemapper/presets/Logitech%20G305/jellyfin-back-fix.json): BTN_SIDE→Alt+Left, BTN_EXTRA→Alt+Right (macro tastiera).
+
+### 14. [DockerJellyfin](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/DockerJellyfin/)
+Copie versionate dei file live di `~/docker/jellyfin` (**solo config, mai volumi/backup/snapshot**).
+*   [sync-from-live.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/DockerJellyfin/sync-from-live.sh): Ricopia compose, script e piano da live a qui; eseguire dopo ogni modifica.
+
 ---
 
 ## Guidelines:

@@ -121,8 +121,17 @@ export default class FullscreenCommandExtension extends Extension {
     }
 
     _evaluate() {
-        const fullscreen = this._anyFullscreen();
-        if (fullscreen) {
+        const mon = this._fullscreenMonitor();
+        if (mon >= 0) {
+            // Il backend KMS segue il monitor del fullscreen senza dialogo:
+            // scrive l'indice (letto dal daemon via DisplayConfig) ad ogni
+            // eval, cosi' lo switch DP-1 <-> HDMI-1 e' automatico.
+            try {
+                GLib.file_set_contents('/tmp/ambilight_monitor',
+                    new TextEncoder().encode(String(mon)));
+            } catch (e) {
+                this._log('monitor write failed: ' + e);
+            }
             if (this._stopTimer) {
                 GLib.source_remove(this._stopTimer);
                 this._stopTimer = null;
@@ -151,6 +160,10 @@ export default class FullscreenCommandExtension extends Extension {
     }
 
     _anyFullscreen() {
+        return this._fullscreenMonitor() >= 0;
+    }
+
+    _fullscreenMonitor() {
         const monitor = this._settings.get_int('monitor');
         const onlyFocused = this._settings.get_boolean('only-focused');
         const focused = global.display.focus_window;
@@ -164,9 +177,9 @@ export default class FullscreenCommandExtension extends Extension {
             if (monitor >= 0 && win.get_monitor() !== monitor)
                 continue;
             if (this._windowIsFullscreen(win))
-                return true;
+                return win.get_monitor();
         }
-        return false;
+        return -1;
     }
 
     _windowIsFullscreen(win) {

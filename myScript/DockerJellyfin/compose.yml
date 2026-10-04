@@ -1,0 +1,35 @@
+name: jellyfin
+
+services:
+  jellyfin:
+    # Tag :latest = major incluse. Aggiornamento a 12.x del 2026-10-02 su richiesta.
+    # Rete: snapshot pre-update + rollback-jellyfin.sh + backup settimanale.
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    # Stesso UID/GID dell'utente host: permessi identici al Flatpak, niente chown.
+    user: "1000:1000"
+    # GPU AMD RX 6700 per VA-API (stesso pattern di ollama-compose.yml: video=39, render=105).
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "39"
+      - "105"
+    volumes:
+      - /home/lorenzo/docker/jellyfin/config:/config
+      - /home/lorenzo/docker/jellyfin/cache:/cache
+      # Media in LETTURA-SCRITTURA: serve per eliminare serie/film direttamente dal client
+      # (come faceva il Flatpak con filesystems=host). Attenzione: un click sbagliato cancella file veri.
+      - /run/media/lorenzo/HardDisk1:/run/media/lorenzo/HardDisk1
+      - /run/media/lorenzo/SSD2:/run/media/lorenzo/SSD2
+      # Necessario: ~/Video/Simulcast, ~/Video/Anime Conclusi, Convertiti, ... sono symlink verso questi dischi.
+      - /run/media/lorenzo/SSD Sata:/run/media/lorenzo/SSD Sata
+      - /home/lorenzo/Video:/home/lorenzo/Video
+      - /home/lorenzo/Jellyfin Server Media:/home/lorenzo/Jellyfin Server Media
+    ports:
+      - "8096:8096"
+    restart: unless-stopped
+    # Tetto anti-impallamento: con questa libreria il baseline e ~1GB, i picchi da scan/transcode
+    # restano sotto i 3GB. Oltre i 4GB il container viene riavviato invece di trascinare il sistema.
+    mem_limit: 4g

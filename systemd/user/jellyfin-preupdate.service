@@ -1,0 +1,6 @@
+[Unit]
+Description=Snapshot pre-update Jellyfin (prima di Watchtower)
+
+[Service]
+Type=oneshot
+ExecStart=/home/lorenzo/docker/jellyfin/pre-update-snapshot.sh

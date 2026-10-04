@@ -1,0 +1,10 @@
+[Unit]
+Description=Snapshot Jellyfin ogni notte prima degli update Watchtower (04:00)
+
+[Timer]
+# 5 minuti prima di Watchtower
+OnCalendar=*-*-* 03:55:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
