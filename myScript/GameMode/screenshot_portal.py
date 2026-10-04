@@ -618,7 +618,7 @@ def kms_follow():
             import kms_capture
             target = kms_capture.pick_target(
                 connector=s.get("kms_connector"),
-                crtc=s.get("kms_crtc"))
+                crtc=s.get("kms_crtc"), log=log)
         except Exception as e:
             log(f"kms follow: pick fallito: {e}")
             continue
@@ -647,7 +647,8 @@ def loop_ready_kms():
         return
     try:
         target = kms_capture.pick_target(
-            connector=s.get("kms_connector"), crtc=s.get("kms_crtc"))
+            connector=s.get("kms_connector"), crtc=s.get("kms_crtc"),
+            log=log)
     except RuntimeError as e:
         log(f"kms: {e}")
         loop.quit()

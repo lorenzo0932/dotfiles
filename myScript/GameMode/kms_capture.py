@@ -163,8 +163,15 @@ def gnome_monitor_connectors(ttl=30.0):
     return mapping
 
 
-def pick_target(connector=None, crtc=None):
-    """Sceglie (output_dict). Solleva RuntimeError se niente e' attivo."""
+def pick_target(connector=None, crtc=None, log=None):
+    """Sceglie (output_dict). Solleva RuntimeError se niente e' attivo.
+
+    --connector/--crtc espliciti sono vincoli rigidi (pin voluto).
+    L'hint da /tmp/ambilight_monitor e' invece SOFT: se punta a un output
+    spento (file stale dopo un cambio layout, es. desktop->TV) si ignora
+    e si ripiega sull'auto-pick invece di far morire il daemon (bug
+    2026-10-04: luci morte sulla TV con hint "0" residuo del desktop).
+    """
     act = active_outputs()
     if not act:
         raise RuntimeError("nessun output DRM attivo (schermi spenti?)")
@@ -174,27 +181,34 @@ def pick_target(connector=None, crtc=None):
                 return o
         raise RuntimeError(f"CRTC {crtc} non attivo "
                            f"(attivi: {[o['crtc_id'] for o in act]})")
-    want = normalize_connector(connector) if connector else None
-    if not want:
-        hint = read_monitor_file()
-        if hint:
-            if hint.isdigit():
-                mapping = gnome_monitor_connectors()
-                conn = mapping.get(int(hint))
-                if conn:
-                    want = normalize_connector(conn)
-                else:
-                    idx = int(hint)
-                    if 0 <= idx < len(act):
-                        return act[idx]
-            else:
-                want = normalize_connector(hint)
-    if want:
+    if connector:
+        want = normalize_connector(connector)
         for o in act:
             if o["name"] == want:
                 return o
         raise RuntimeError(f"connettore {want} non attivo "
                            f"(attivi: {[o['name'] for o in act]})")
+    hint = read_monitor_file()
+    if hint:
+        want = None
+        if hint.isdigit():
+            mapping = gnome_monitor_connectors()
+            conn = mapping.get(int(hint))
+            if conn:
+                want = normalize_connector(conn)
+            else:
+                idx = int(hint)
+                if 0 <= idx < len(act):
+                    return act[idx]
+        else:
+            want = normalize_connector(hint)
+        if want:
+            for o in act:
+                if o["name"] == want:
+                    return o
+            if log:
+                log(f"kms: hint '{hint}' stale (attivi: "
+                    f"{[o['name'] for o in act]}), uso auto-pick")
     if len(act) == 1:
         return act[0]
     # Piu' output attivi senza hint: fallback deterministico + log esplicito
