@@ -1,0 +1,10 @@
+[Unit]
+Description=DriveBackup file importanti sui Google Drive (eseguito da timer)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/lorenzo/.local/share/myScript/DriveBackup/drive-backup.sh
+
+[Install]
+WantedBy=default.target

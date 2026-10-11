@@ -95,6 +95,12 @@ Versioned input-remapper preset (mouse side buttons → Alt+Left/Right, workarou
 Copie versionate dei file live di `~/docker/jellyfin` (**solo config, mai volumi/backup/snapshot**).
 *   [sync-from-live.sh](file:///home/lorenzo/Documenti/GitHub/dotfiles/myScript/DockerJellyfin/sync-from-live.sh): Ricopia compose, script e piano da live a qui; eseguire dopo ogni modifica.
 
+### 15. DriveBackup
+Backup mensile dei soli file importanti sui due Google Drive via rclone (autonomo: usa solo `drive-jobs.conf`, mai `rSync.sh`/`exclude.txt`; solo copia, mai delete sul Drive).
+*   `drive-backup.sh`: pre-check (rclone, remote `gpers`/`glav`, rete), `rclone copy --update --checksum` + `rclone check` per job, lockfile, notify desktop su errori. Log in `logs/` (esclusi dal mirror dotfiles dalla regola `*.log`).
+*   `drive-jobs.conf`: tabella sorgente→destinazione (personale → `gpers:Backup-PC/Personale/`, lavoro → `glav:Backup-PC/Lavoro/`).
+*   Eseguito da `drive-backup.service` / `drive-backup.timer` (mensile, `Persistent=true`).
+
 ---
 
 ## Guidelines:

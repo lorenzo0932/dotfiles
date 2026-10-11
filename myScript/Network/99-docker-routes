@@ -1,0 +1,17 @@
+#!/bin/bash
+# Ripristina le rotte scope-link dei bridge Docker dopo ogni riconnessione.
+# Senza queste, i container (jellyfin, ollama) diventano irraggiungibili dall'host:
+# NetworkManager ricostruisce la tabella main e le rotte dei bridge non vengono ricreate.
+# Idempotente e silenzioso se tutto è già a posto.
+ACTION="$2"
+[ "$ACTION" = "up" ] || [ "$ACTION" = "connectivity-change" ] || exit 0
+for br in /sys/class/net/br-* /sys/class/net/docker0; do
+    [ -d "$br" ] || continue
+    dev=$(basename "$br")
+    ip -o -4 addr show dev "$dev" 2>/dev/null | grep -oP 'inet \K[0-9.]+/[0-9]+' | while read -r cidr; do
+        [ -n "$cidr" ] || continue
+        net=$(python3 -c "import ipaddress,sys; print(ipaddress.ip_interface(sys.argv[1]).network)" "$cidr")
+        ip route show "$net" 2>/dev/null | grep -q . || ip route add "$net" dev "$dev" scope link
+    done
+done
+exit 0

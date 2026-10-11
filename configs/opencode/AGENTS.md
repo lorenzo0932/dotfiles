@@ -21,12 +21,17 @@ Config unica sincronizzata in `configs/opencode/` (regola dedicata in rSync.sh):
 le regole sotto sono imposte dalla config (compaction automatica, pin dei
 modelli, steps) o dal comportamento da tenere in sessione.
 
-- **Modelli**: default `opencode-go/deepseek-v4-flash` (benchmark v2: flash
-  batte i premium in agentico a 1/35 del costo). I comandi task (`/plan`,
-  `/verify`, `/init`, `/review-codebase`) e gli agenti (primary e subagent,
-  quindi anche explore/scout via Task) usano il modello selezionato con
-  `/models` nella sessione corrente — nessun pin, niente sorprese alla
-  risoluzione. I premium SOLO a richiesta esplicita:
+- **Modelli**: default `opencode/muse-spark-1.3-contributor-free` (unico modello
+  in `opencode.jsonc`, anche come `small_model`; nessun provider locale).
+  I comandi task (`/plan`, `/verify`, `/init`, `/review-codebase`) e gli agenti
+  primary usano il modello selezionato con `/models` nella sessione corrente —
+  nessun pin, niente sorprese alla risoluzione. `explore`/`scout` ereditano il
+  primario (nessun override in config). I premium SOLO a richiesta esplicita:
+- **Niente delega locale**: mappature ed esplorazione si fanno direttamente
+  dal primario con `read`/`grep` mirati (cfr. test confronto 2026-10-10:
+  tutto-remoto 3/3 in ~12s vs tandem 0/3 in ~106s — explore locale dismesso
+  perché flaky/inaffidabile). `@explore`/`@scout` solo come subagent remoti
+  per ricerche circoscritte, mai per risparmio pool (inesistente).
   - `/second-opinion-gemini` (comando dedicato): `google/gemini-3.7-flash`,
     single-shot. Vincitore dell'A/B test su `gemini-3.5-flash` (verdetto più
     netto, piano DTO più completo) e su Luna per l'insight di dominio (es.

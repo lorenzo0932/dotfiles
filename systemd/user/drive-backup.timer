@@ -1,0 +1,10 @@
+[Unit]
+Description=Backup mensile file importanti sui Google Drive
+
+[Timer]
+# Una volta al mese, il giorno 1 alle 03:00; recupera se spento (Persistent)
+OnCalendar=monthly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
