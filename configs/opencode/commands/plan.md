@@ -1,24 +1,20 @@
 ---
-description: Genera un piano dettagliato per la feature richiesta (modifiche file-per-file, motivazioni, scelte di design, rischi, verifica) — solo analisi, nessuna modifica
+description: Piano breve e facoltativo per la feature richiesta (obiettivo, rischi, criteri di accettazione, verifica) — solo analisi, nessuna modifica
 agent: plan
 ---
 
-Prepara un piano dettagliato e operativo per la feature/fix richiesta.
+Prepara un piano BREVE e operativo per la feature/fix richiesta. Il piano è
+facoltativo: per task chiari basta un piano minimo; non produrre un manuale
+file-per-file se non riduce il rischio.
 
 $ARGUMENTS
 
-Analizza il codebase in modo mirato (struttura dei sorgenti, build system,
-convenzioni, pattern esistenti, AGENTS.md di repo) e produci:
+Produci al massimo:
+1. **Obiettivo** e cosa resta fuori scope.
+2. **Rischi** concreti (regressioni, dati, sicurezza) e contromisure.
+3. **Criteri di accettazione** verificabili.
+4. **Verifica**: come si controlla (test/comandi mirati, criteri di done).
+5. **Passi essenziali** in ordine, con eventuali dipendenze.
 
-1. **Obiettivo e contorno**: cosa fa la feature e cosa NON fa (out of scope).
-2. **Modifiche file-per-file**: per ogni file, cosa cambia e perché
-   (`path:riga` dove sensato), inclusi test e docs se rilevanti.
-3. **Scelte di design**: alternative valutate e perché scartate.
-4. **Rischi e regressioni possibili**, con contromisure.
-5. **Piano di verifica**: test mirati (`ctest --test-dir build -R <target>`,
-   `bash -n`), criteri di done.
-6. **Passi di implementazione in ordine**, con dipendenze.
-
-Non modificare file e non fare commit: il piano è il punto di rientro se la
-feature non viene completata in sessione. Quando l'implementazione parte, il
-piano verrà salvato in `plan/<slug>.md` sulla branch dedicata.
+Non modificare file e non fare commit. Per feature non banali il piano verrà
+salvato in `plan/<slug>.md` sulla branch dedicata (mai committato né pushato).

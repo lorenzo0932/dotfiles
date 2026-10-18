@@ -1,0 +1,6 @@
+[Unit]
+Description=Ripristina Jellyfin se la rete Docker non risponde
+
+[Service]
+Type=oneshot
+ExecStart=/home/lorenzo/docker/jellyfin/watchdog.sh

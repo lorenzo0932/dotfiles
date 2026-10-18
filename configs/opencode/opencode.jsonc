@@ -1,30 +1,41 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "opencode/muse-spark-1.3-contributor-free",
-  "small_model": "opencode/muse-spark-1.3-contributor-free",
+  "model": "opencode/deepseek-v4.1-flash-free",
   "compaction": {
     "auto": true,
-    "tail_turns": 15
+    "keep": {
+      "tokens": 15000
+    }
   },
-  "agent": {
+  "agents": {
+    "title": {
+      "model": "opencode/deepseek-v4.1-flash-free"
+    },
     "build": {
       "mode": "primary",
-      "model": "opencode/muse-spark-1.3-contributor-free",
-      "description": "Agente principale di sviluppo (42/42 nel benchmark)"
+      "description": "Agente principale di sviluppo"
     },
     "plan": {
       "mode": "primary",
-      "model": "opencode/muse-spark-1.3-contributor-free",
       "temperature": 0.1,
       "description": "Analisi e piani senza modifiche"
     },
     "explore": {
       "mode": "subagent",
-      "description": "Multi-file codebase mapping, file search by pattern, keyword search. Read-only, cannot edit. Always end with a text summary including path:riga citations."
+      "description": "Esplorazione multi-file del codebase (ricerca per pattern o parole chiave). Sola lettura imposta: edit e shell disabilitati. Termina sempre con un riassunto testuale con citazioni path:riga.",
+      "permissions": [
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" }
+      ]
     },
     "scout": {
       "mode": "subagent",
-      "description": "External docs and dependency research, read-only. Use for upstream/library cross-check without touching workspace."
+      "description": "Ricerca di documentazione e dipendenze esterne. Sola lettura sul workspace: edit, shell e lancio di sottoagenti disabilitati; restano lettura file e web fetch/search.",
+      "permissions": [
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "*", "effect": "deny" }
+      ]
     }
   }
 }

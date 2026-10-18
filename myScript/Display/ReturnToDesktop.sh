@@ -1,9 +1,12 @@
 #!/bin/bash
+# Switch back to desktop monitor (DP-1). Keep GNOME extensions enabled:
+# toggling them during display changes causes teardown races.
+exec 9>/tmp/display-switch.lock
+flock -n 9 || exit 0
+
+GMC=/home/lorenzo/.local/bin/gnome-monitor-config
 
 #killall jellyfinmediaplayer;
 #killall kodi;
-/home/lorenzo/.local/bin/gnome-monitor-config set -LpM  DP-1 -t normal -m 2560x1080@74.991+vrr -s 1
-gnome-extensions enable Vitals@CoreCoding.com
-gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com
-gnome-extensions enable tiling-assistant@leleat-on-github
-gsettings set org.gnome.desktop.interface text-scaling-factor 0.90   
+"$GMC" set -LpM DP-1 -t normal -m 2560x1080@74.991+vrr -s 1
+gsettings set org.gnome.desktop.interface text-scaling-factor 0.90

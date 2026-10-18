@@ -1,0 +1,13 @@
+[Unit]
+Description=Re-apply Sound Blaster volume after resume from suspend
+Documentation=file:%h/.local/share/myScript/Audio/WatchResume.sh
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/myScript/Audio/WatchResume.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

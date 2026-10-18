@@ -4,6 +4,16 @@ import * as Util from 'resource:///org/gnome/shell/misc/util.js';
 
 export default class FullscreenCommandExtension extends Extension {
     enable() {
+        // Idempotent: a previous enable may have leaked (double enable
+        // without disable across monitor reconfigs). Clean up first so no
+        // timers/signals survive bound to a stale state.
+        if (this._settings) {
+            try {
+                this.disable();
+            } catch (e) {
+                console.error(`[fullscreen-command] cleanup: ${e}`);
+            }
+        }
         this._settings = this.getSettings();
         this._running = false;
         this._stopTimer = null;
@@ -26,6 +36,8 @@ export default class FullscreenCommandExtension extends Extension {
             // Keep the recurring source alive even if one pass fails.
             this._rescanTimer = GLib.timeout_add_seconds(
                 GLib.PRIORITY_DEFAULT, interval, () => {
+                    if (!this._settings)
+                        return GLib.SOURCE_REMOVE;
                     try {
                         this._evaluate();
                     } catch (e) {
@@ -39,35 +51,46 @@ export default class FullscreenCommandExtension extends Extension {
     }
 
     disable() {
-        if (this._evalId) {
-            GLib.source_remove(this._evalId);
-            this._evalId = null;
-        }
-        if (this._stopTimer) {
-            GLib.source_remove(this._stopTimer);
-            this._stopTimer = null;
-        }
-        if (this._rescanTimer) {
-            GLib.source_remove(this._rescanTimer);
-            this._rescanTimer = null;
-        }
+        const safeRemove = id => {
+            if (id) {
+                try {
+                    GLib.source_remove(id);
+                } catch (e) { /* already gone */ }
+            }
+        };
+        safeRemove(this._evalId);
+        this._evalId = null;
+        safeRemove(this._stopTimer);
+        this._stopTimer = null;
+        safeRemove(this._rescanTimer);
+        this._rescanTimer = null;
         for (const [win, conns] of this._winConns) {
-            for (const id of conns)
-                win.disconnect(id);
+            for (const id of conns) {
+                try {
+                    win.disconnect(id);
+                } catch (e) { /* window already disposed */ }
+            }
         }
         this._winConns.clear();
-        for (const id of this._displaySignals)
-            global.display.disconnect(id);
+        for (const id of this._displaySignals) {
+            try {
+                global.display.disconnect(id);
+            } catch (e) { /* already disconnected */ }
+        }
         this._displaySignals = [];
 
-        if (this._running)
-            this._run('stop-command');
+        try {
+            if (this._running)
+                this._run('stop-command');
+        } catch (e) {
+            console.error(`[fullscreen-command] stop: ${e}`);
+        }
         this._running = false;
         this._settings = null;
     }
 
     _onWindowAdded(win) {
-        if (!win || this._winConns.has(win))
+        if (!this._settings || !win || this._winConns.has(win))
             return;
         const conns = [];
         // Window signals differ across Mutter versions (e.g. 'destroy' and
@@ -107,7 +130,7 @@ export default class FullscreenCommandExtension extends Extension {
     }
 
     _scheduleEval() {
-        if (this._evalId)
+        if (!this._settings || this._evalId)
             return;
         this._evalId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
             this._evalId = null;
@@ -121,6 +144,8 @@ export default class FullscreenCommandExtension extends Extension {
     }
 
     _evaluate() {
+        if (!this._settings)
+            return;
         const mon = this._fullscreenMonitor();
         if (mon >= 0) {
             // Il backend KMS segue il monitor del fullscreen senza dialogo:
@@ -164,6 +189,8 @@ export default class FullscreenCommandExtension extends Extension {
     }
 
     _fullscreenMonitor() {
+        if (!this._settings)
+            return -1;
         const monitor = this._settings.get_int('monitor');
         const onlyFocused = this._settings.get_boolean('only-focused');
         const focused = global.display.focus_window;
@@ -211,6 +238,8 @@ export default class FullscreenCommandExtension extends Extension {
     }
 
     _run(key) {
+        if (!this._settings)
+            return;
         const cmd = this._settings.get_string(key);
         if (!cmd) {
             this._log(`empty ${key}, nothing to run`);
